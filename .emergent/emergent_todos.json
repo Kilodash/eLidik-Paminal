@@ -1,43 +1,27 @@
 [
   {
-    "content": "Setup Supabase client dan connection utilities",
-    "status": "completed"
-  },
-  {
-    "content": "Buat fresh database schema di Supabase sesuai requirement lengkap",
-    "status": "completed"
-  },
-  {
-    "content": "Seed database dengan 9 default users dan master data",
-    "status": "completed"
-  },
-  {
-    "content": "Build API Routes: Auth (login, me) dengan JWT",
-    "status": "in_progress"
-  },
-  {
     "content": "Build API Routes: Dashboard (stats, charts, SLA monitoring)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build API Routes: Dumas CRUD + bulk actions (merge, delete)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build API Routes: Tindak Lanjut dengan workflow approval",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build API Routes: Settings (master data CRUD)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build API Routes: Anggota, Templates, Audit Log",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build UI: Login page dengan Police theme",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Build UI: Collapsible sidebar layout dengan notification system",

@@ -5,8 +5,9 @@ import { query } from '@/lib/db'
 // GET - Get Tindak Lanjut
 export async function GET(
   request: NextRequest,
-  { params }: { params: { dumas_id: string } }
+  props: { params: Promise<{ dumas_id: string }> }
 ) {
+  const params = await props.params
   try {
     const user = getCurrentUser(request)
     const { dumas_id } = params
@@ -38,8 +39,9 @@ export async function GET(
 // PUT - Update Tindak Lanjut
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { dumas_id: string } }
+  props: { params: Promise<{ dumas_id: string }> }
 ) {
+  const params = await props.params
   try {
     const user = getCurrentUser(request)
     const { dumas_id } = params

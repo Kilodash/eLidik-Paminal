@@ -5,8 +5,9 @@ import { query } from '@/lib/db'
 // POST - Approve or Reject
 export async function POST(
   request: NextRequest,
-  { params }: { params: { dumas_id: string } }
+  props: { params: Promise<{ dumas_id: string }> }
 ) {
+  const params = await props.params
   try {
     const user = getCurrentUser(request)
     const { dumas_id } = params

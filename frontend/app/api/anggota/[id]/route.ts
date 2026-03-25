@@ -5,8 +5,9 @@ import { query } from '@/lib/db'
 // PUT - Update anggota
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
+  const params = await props.params
   try {
     const user = getCurrentUser(request)
     
@@ -65,8 +66,9 @@ export async function PUT(
 // DELETE - Soft delete anggota
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
+  const params = await props.params
   try {
     const user = getCurrentUser(request)
     

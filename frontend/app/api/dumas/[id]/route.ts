@@ -5,8 +5,9 @@ import { query } from '@/lib/db'
 // GET - Detail Dumas
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
+  const params = await props.params
   try {
     const user = getCurrentUser(request)
     const { id } = params
@@ -46,8 +47,9 @@ export async function GET(
 // PUT - Update Dumas
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
+  const params = await props.params
   try {
     const user = getCurrentUser(request)
     const { id } = params
@@ -120,8 +122,9 @@ export async function PUT(
 // DELETE - Soft delete Dumas
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
+  const params = await props.params
   try {
     const user = getCurrentUser(request)
     const { id } = params

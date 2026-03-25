@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +15,9 @@ import { toast } from 'sonner'
 import { ArrowLeft, Save, Send, CheckCircle, XCircle } from 'lucide-react'
 import { format } from 'date-fns'
 
-export default function DumasDetailPage({ params }: { params: { id: string } }) {
+export default function DumasDetailPage() {
+  const params = useParams()
+  const id = params.id as string
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -26,13 +28,15 @@ export default function DumasDetailPage({ params }: { params: { id: string } }) 
   useEffect(() => {
     const userData = localStorage.getItem('user')
     if (userData) setUser(JSON.parse(userData))
-    fetchDumasDetail()
-  }, [params.id])
+    if (id) {
+      fetchDumasDetail()
+    }
+  }, [id])
 
   const fetchDumasDetail = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/dumas/${params.id}`, {
+      const response = await fetch(`/api/dumas/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
 
@@ -55,7 +59,7 @@ export default function DumasDetailPage({ params }: { params: { id: string } }) 
     setSaving(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/tindak-lanjut/${params.id}`, {
+      const response = await fetch(`/api/tindak-lanjut/${id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -80,7 +84,7 @@ export default function DumasDetailPage({ params }: { params: { id: string } }) 
 
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/tindak-lanjut/${params.id}/submit`, {
+      const response = await fetch(`/api/tindak-lanjut/${id}/submit`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -97,7 +101,7 @@ export default function DumasDetailPage({ params }: { params: { id: string } }) 
   const handleApproval = async (action: 'approve' | 'reject', catatan?: string) => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/tindak-lanjut/${params.id}/approve`, {
+      const response = await fetch(`/api/tindak-lanjut/${id}/approve`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -5,8 +5,9 @@ import { query } from '@/lib/db'
 // GET - Get settings by type
 export async function GET(
   request: NextRequest,
-  { params }: { params: { type: string } }
+  props: { params: Promise<{ type: string }> }
 ) {
+  const params = await props.params
   try {
     const user = getCurrentUser(request)
     const { type } = params
@@ -37,8 +38,9 @@ export async function GET(
 // PUT - Update settings
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { type: string } }
+  props: { params: Promise<{ type: string }> }
 ) {
+  const params = await props.params
   try {
     const user = getCurrentUser(request)
     

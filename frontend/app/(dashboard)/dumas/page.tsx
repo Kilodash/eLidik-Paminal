@@ -117,20 +117,20 @@ export default function DumasListPage() {
 
   return (
     <div className="space-y-6" data-testid="dumas-list-page">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-heading">Daftar Dumas</h1>
-          <p className="text-muted-foreground mt-1">Kelola semua pengaduan masyarakat</p>
+          <h1 className="text-3xl font-extrabold font-heading tracking-tight bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">Daftar Dumas</h1>
+          <p className="text-slate-500 mt-1 font-medium">Kelola semua pengaduan masyarakat</p>
         </div>
         <Link href="/dumas/create">
-          <Button data-testid="create-dumas-button">
+          <Button data-testid="create-dumas-button" className="rounded-full shadow-md bg-blue-600 hover:bg-blue-700 transition-all hover:scale-105 active:scale-95">
             <Plus className="h-4 w-4 mr-2" />
             Registrasi Dumas
           </Button>
         </Link>
       </div>
 
-      <Card>
+      <Card className="apple-glass border-white/50 shadow-sm rounded-3xl">
         <CardHeader>
           <CardTitle>Filter & Pencarian</CardTitle>
         </CardHeader>
@@ -180,7 +180,7 @@ export default function DumasListPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="apple-glass border-white/50 shadow-sm rounded-3xl overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
@@ -248,10 +248,11 @@ export default function DumasListPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="hover:bg-blue-50 hover:text-blue-600 rounded-full font-semibold transition-colors"
                           onClick={() => router.push(`/dumas/${item.id}`)}
                           data-testid={`view-dumas-${item.id}`}
                         >
-                          Lihat
+                          Lihat Detail
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -270,6 +271,7 @@ export default function DumasListPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="rounded-full bg-white/50 backdrop-blur-md border border-white/40 hover:bg-white/80"
                 onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
                 disabled={pagination.page === 1}
                 data-testid="prev-page-button"
@@ -279,6 +281,7 @@ export default function DumasListPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="rounded-full bg-white/50 backdrop-blur-md border border-white/40 hover:bg-white/80"
                 onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
                 disabled={pagination.page === pagination.total_pages}
                 data-testid="next-page-button"

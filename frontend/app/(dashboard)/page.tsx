@@ -96,155 +96,154 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8" data-testid="dashboard-page">
-      <div>
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent font-heading tracking-tight">Perkembangan Dumas</h1>
-        <p className="text-slate-500 mt-1.5 font-medium">Ringkasan statistik dan monitoring pengaduan masyarakat secara real-time</p>
-      </div>
-
-      {/* Stats Cards - Bento Box Style */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-auto">
-        <Card data-testid="stat-card-total" className="relative overflow-hidden border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] bg-white group col-span-1 lg:col-span-2">
-          <div className="absolute -top-6 -right-6 p-4 opacity-5 group-hover:opacity-10 transition-opacity duration-500">
-             <FileText className="w-32 h-32" />
+    <div className="space-y-8 relative" data-testid="dashboard-page">
+      {/* Stats Cards - Apple Bento Style */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-auto relative z-10 pt-2">
+        <Card data-testid="stat-card-total" className="relative overflow-hidden border-none apple-glass hover:bg-white/80 group col-span-1 lg:col-span-2 rounded-[2rem]">
+          <div className="absolute -top-6 -right-6 p-4 opacity-5 group-hover:opacity-10 transition-opacity duration-500 blur-sm group-hover:blur-none">
+             <FileText className="w-32 h-32 text-blue-900" />
           </div>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 z-10 relative">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 z-10 relative px-8 pt-8">
             <CardTitle className="text-sm font-bold text-slate-500 uppercase tracking-widest">Total Pengaduan</CardTitle>
-            <div className="p-2.5 bg-blue-50/80 rounded-xl text-blue-600">
-              <FileText className="h-5 w-5" />
+            <div className="p-3 bg-white/60 backdrop-blur-md rounded-2xl text-blue-600 border border-white/50 shadow-sm">
+              <FileText className="h-6 w-6" />
             </div>
           </CardHeader>
-          <CardContent className="z-10 relative">
-            <div className="text-5xl font-extrabold text-slate-900 tracking-tighter mt-2">{stats?.total || 0}</div>
-            <p className="text-sm text-slate-500 mt-3 font-medium bg-slate-50 inline-block px-3 py-1 rounded-full">Keseluruhan dumas terdaftar</p>
+          <CardContent className="z-10 relative px-8 pb-8">
+            <div className="text-6xl font-extrabold text-slate-900 tracking-tighter mt-2">{stats?.total || 0}</div>
+            <p className="text-sm text-slate-500 mt-4 font-semibold bg-white/50 backdrop-blur-md border border-white/50 inline-block px-4 py-1.5 rounded-full shadow-sm">Keseluruhan dumas terdaftar</p>
           </CardContent>
         </Card>
 
-        <Card data-testid="stat-card-dalam-proses" className="relative overflow-hidden border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] bg-gradient-to-br from-blue-500 to-blue-600 group text-white">
-          <div className="absolute -top-4 -right-4 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
+        <Card data-testid="stat-card-dalam-proses" className="relative overflow-hidden border-none bg-blue-600/10 backdrop-blur-xl border-blue-500/20 shadow-[0_8px_32px_rgba(37,99,235,0.1)] hover:bg-blue-600/15 group text-blue-900 rounded-[2rem]">
+          <div className="absolute -top-4 -right-4 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500 mix-blend-overlay">
              <Clock className="w-24 h-24" />
           </div>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 z-10 relative">
-            <CardTitle className="text-sm font-bold text-blue-100 uppercase tracking-widest">Dalam Proses</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 z-10 relative px-6 pt-6">
+            <CardTitle className="text-sm font-bold text-blue-800/80 uppercase tracking-widest">Dalam Proses</CardTitle>
           </CardHeader>
-          <CardContent className="z-10 relative">
-            <div className="text-4xl font-extrabold tracking-tighter mt-2">{stats?.dalam_proses || 0}</div>
-            <p className="text-xs text-blue-200 mt-3 font-medium">Sedang ditindaklanjuti</p>
+          <CardContent className="z-10 relative px-6 pb-6">
+            <div className="text-5xl font-extrabold tracking-tighter mt-2 text-blue-700">{stats?.dalam_proses || 0}</div>
+            <p className="text-xs text-blue-800/80 mt-3 font-semibold tracking-wide">Sedang ditindaklanjuti</p>
           </CardContent>
         </Card>
 
-        <Card data-testid="stat-card-terbukti" className="relative overflow-hidden border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] bg-white group">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 z-10 relative">
+        <Card data-testid="stat-card-terbukti" className="relative overflow-hidden border-none apple-glass hover:bg-white/80 group rounded-[2rem]">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 z-10 relative px-6 pt-6">
             <CardTitle className="text-sm font-bold text-slate-500 uppercase tracking-widest">Terbukti</CardTitle>
-            <div className="p-2.5 bg-green-50 rounded-xl text-green-600">
+            <div className="p-2.5 bg-green-500/10 backdrop-blur-md rounded-2xl text-green-600 border border-green-500/20">
               <CheckCircle className="h-5 w-5" />
             </div>
           </CardHeader>
-          <CardContent className="z-10 relative">
+          <CardContent className="z-10 relative px-6 pb-6">
             <div className="text-4xl font-extrabold text-slate-800 tracking-tighter mt-2">{stats?.terbukti || 0}</div>
           </CardContent>
         </Card>
 
-        <Card data-testid="stat-card-tidak-terbukti" className="relative overflow-hidden border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] bg-white group">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 z-10 relative">
-            <CardTitle className="text-sm font-bold text-slate-500 uppercase tracking-widest">Tidak Terbukti</CardTitle>
-            <div className="p-2.5 bg-slate-100 rounded-xl text-slate-600">
+        <Card data-testid="stat-card-tidak-terbukti" className="relative overflow-hidden border-none apple-glass hover:bg-white/80 group rounded-[2rem]">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 z-10 relative px-6 pt-6">
+            <CardTitle className="text-sm font-bold text-slate-500 uppercase tracking-widest">Tdk Terbukti</CardTitle>
+            <div className="p-2.5 bg-slate-500/10 backdrop-blur-md rounded-2xl text-slate-600 border border-slate-500/20">
               <AlertCircle className="h-5 w-5" />
             </div>
           </CardHeader>
-          <CardContent className="z-10 relative">
+          <CardContent className="z-10 relative px-6 pb-6">
             <div className="text-4xl font-extrabold text-slate-800 tracking-tighter mt-2">{stats?.tidak_terbukti || 0}</div>
           </CardContent>
         </Card>
 
-        <Card data-testid="stat-card-sla-warning" className="relative overflow-hidden border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] bg-white group">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 z-10 relative">
+        <Card data-testid="stat-card-sla-warning" className="relative overflow-hidden border-none apple-glass hover:bg-white/80 group rounded-[2rem]">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 z-10 relative px-6 pt-6">
             <CardTitle className="text-sm font-bold text-slate-500 uppercase tracking-widest">SLA Warning</CardTitle>
-            <div className="p-2.5 bg-yellow-50 rounded-xl text-yellow-600">
+            <div className="p-2.5 bg-yellow-500/10 backdrop-blur-md rounded-2xl text-yellow-600 border border-yellow-500/20">
               <AlertTriangle className="h-5 w-5" />
             </div>
           </CardHeader>
-          <CardContent className="z-10 relative">
+          <CardContent className="z-10 relative px-6 pb-6">
             <div className="text-4xl font-extrabold text-yellow-600 tracking-tighter mt-2">{stats?.sla_warning || 0}</div>
             <p className="text-xs text-slate-400 mt-2 font-medium">&gt; 14 hari</p>
           </CardContent>
         </Card>
 
-        <Card data-testid="stat-card-sla-critical" className="relative overflow-hidden border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] bg-white group lg:col-span-2">
-          <div className="absolute -top-4 -right-4 p-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
-             <AlertCircle className="w-32 h-32 text-red-500" />
+        <Card data-testid="stat-card-sla-critical" className="relative overflow-hidden border-none bg-red-500/10 backdrop-blur-xl border-red-500/20 shadow-[0_8px_32px_rgba(239,68,68,0.1)] hover:bg-red-500/15 group text-red-900 lg:col-span-2 rounded-[2rem]">
+          <div className="absolute -top-4 -right-4 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500 mix-blend-overlay">
+             <AlertCircle className="w-32 h-32 text-red-700" />
           </div>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 z-10 relative">
-            <CardTitle className="text-sm font-bold text-red-500 uppercase tracking-widest">SLA Kritis (Tunggakan)</CardTitle>
-            <div className="p-2.5 bg-red-50 rounded-xl text-red-600 animate-pulse">
-              <AlertCircle className="h-5 w-5" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2 z-10 relative px-8 pt-8">
+            <CardTitle className="text-sm font-bold text-red-700/80 uppercase tracking-widest">SLA Kritis (Tunggakan)</CardTitle>
+            <div className="p-3 bg-red-500/20 backdrop-blur-md rounded-2xl text-red-700 border border-red-500/30 animate-pulse">
+              <AlertCircle className="h-6 w-6" />
             </div>
           </CardHeader>
-          <CardContent className="z-10 relative">
+          <CardContent className="z-10 relative px-8 pb-8">
             <div className="text-5xl font-extrabold text-red-600 tracking-tighter mt-2">{stats?.sla_critical || 0}</div>
-            <p className="text-sm text-red-400/80 mt-3 font-medium bg-red-50 inline-block px-3 py-1 rounded-full">&gt; 30 hari tanpa kepastian</p>
+            <p className="text-sm text-red-600 mt-4 font-bold bg-white/40 backdrop-blur-md border border-red-500/20 inline-block px-4 py-1.5 rounded-full shadow-sm">&gt; 30 hari tanpa kepastian</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Charts & SLA */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <Card className="lg:col-span-3 border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] bg-white">
-          <CardHeader className="px-6 py-5 border-b border-slate-100">
-            <CardTitle className="text-lg font-bold text-slate-800">Distribusi Satker</CardTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 relative z-10">
+        <Card className="lg:col-span-3 border-none apple-glass overflow-hidden rounded-[2rem]">
+          <CardHeader className="px-8 py-6 border-b border-white/20">
+            <CardTitle className="text-xl font-bold text-slate-800">Distribusi Satker</CardTitle>
             <CardDescription className="text-slate-500 font-medium">Beban pengaduan tiap satuan kerja wilayah (Top 10)</CardDescription>
           </CardHeader>
-          <CardContent className="p-6">
+          <CardContent className="p-8">
             <ResponsiveContainer width="100%" height={320}>
               <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="satker" axisLine={false} tickLine={false} textAnchor="end" height={80} fontSize={11} angle={-35} fill="#64748b" />
-                <YAxis axisLine={false} tickLine={false} fontSize={12} fill="#64748b" />
-                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
-                <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                <XAxis dataKey="satker" axisLine={false} tickLine={false} textAnchor="end" height={80} fontSize={11} angle={-35} fill="#475569" />
+                <YAxis axisLine={false} tickLine={false} fontSize={12} fill="#475569" />
+                <Tooltip cursor={{fill: 'rgba(255,255,255,0.4)'}} contentStyle={{ borderRadius: '16px', border: '1px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(12px)', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }} />
+                <Bar dataKey="count" fill="rgba(59, 130, 246, 0.8)" radius={[8, 8, 4, 4]} maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
         {/* SLA List */}
-        <Card className="lg:col-span-2 border-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] bg-white overflow-hidden flex flex-col">
-          <CardHeader className="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
+        <Card className="lg:col-span-2 border-none apple-glass overflow-hidden flex flex-col rounded-[2rem]">
+          <CardHeader className="px-8 py-6 border-b border-white/20 bg-white/20 backdrop-blur-sm">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20 backdrop-blur-md">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                  </div>
                   SLA Warning
                 </CardTitle>
                 <CardDescription className="text-slate-500 font-medium mt-1">Melewati batas normal</CardDescription>
               </div>
-              <Badge variant="outline" className="bg-white px-3 py-1 text-slate-600 shadow-sm border-slate-200">
+              <Badge variant="outline" className="bg-white/60 backdrop-blur-md px-3 py-1.5 text-slate-700 shadow-sm border-white/80 font-bold rounded-full">
                 {slaList.length} dumas
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="p-0 flex-1 overflow-hidden">
-            <div className="max-h-[350px] overflow-y-auto w-full p-2">
+            <div className="max-h-[350px] overflow-y-auto w-full p-4">
               {slaList.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                  <CheckCircle className="h-12 w-12 text-slate-200 mb-3" />
-                  <p className="text-sm font-medium">Bagus! Semua dumas aman.</p>
+                  <div className="bg-white/50 p-4 rounded-full mb-4 shadow-sm border border-white/60">
+                    <CheckCircle className="h-10 w-10 text-slate-300" />
+                  </div>
+                  <p className="text-sm font-semibold tracking-wide">Bagus! Semua dumas aman.</p>
                 </div>
               ) : (
-                <div className="space-y-1.5 p-2 px-3">
+                <div className="space-y-3 p-2">
                   {slaList.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between p-3.5 bg-white border border-slate-100 rounded-xl hover:border-slate-300 hover:shadow-md cursor-pointer transition-all duration-200 group"
+                      className="flex items-center justify-between p-4 bg-white/40 backdrop-blur-md border border-white/60 rounded-2xl hover:bg-white/60 hover:shadow-lg cursor-pointer transition-all duration-300 group hover:-translate-y-1"
                       onClick={() => router.push(`/dumas/${item.id}`)}
                       data-testid={`sla-item-${item.id}`}
                     >
                       <div className="flex-1 min-w-0 pr-4">
-                        <p className="text-sm font-bold text-slate-800 truncate group-hover:text-blue-600 transition-colors">{item.no_dumas}</p>
-                        <p className="text-xs text-slate-500 mt-1 truncate font-medium">
+                        <p className="text-sm font-bold text-slate-800 truncate group-hover:text-blue-700 transition-colors">{item.no_dumas}</p>
+                        <p className="text-xs text-slate-600 mt-1 truncate font-medium">
                           <span className="text-slate-400">Terlapor:</span> {item.terlapor}
                         </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5 truncate uppercase tracking-wider">{item.satker}</p>
+                        <p className="text-[10px] text-slate-500 mt-1 truncate font-bold bg-white/50 inline-block px-2 py-0.5 rounded-full border border-white/40">{item.satker}</p>
                       </div>
                       <div className="flex-shrink-0">
                         {getSLABadge(item.sla_days)}

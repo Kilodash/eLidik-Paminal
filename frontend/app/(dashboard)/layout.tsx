@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image' // Added next/image import
 import { Home, FileText, PlusCircle, Settings, Archive, Menu, X, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -78,120 +79,124 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 transition-all duration-300 bg-slate-950 border-r border-slate-800 text-slate-100",
-          sidebarOpen ? "w-64" : "w-0 lg:w-20"
-        )}
-        data-testid="sidebar"
-      >
-        <div className="flex flex-col h-full shadow-[4px_0_24px_rgba(0,0,0,0.1)]">
-          {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b border-slate-800/60">
-            {sidebarOpen && (
-              <div className="flex-1">
-                <h2 className="text-xl font-bold font-heading tracking-tight bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">Simondu Web</h2>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mt-0.5">Paminal Propam</p>
-              </div>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              data-testid="sidebar-toggle"
-            >
-              {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5 mx-auto" />}
-            </Button>
-          </div>
+    <div className="min-h-screen flex flex-col relative font-sans">
+      {/* Apple VisionOS Global Background Blur Orbs (Optional aesthetic) */}
+      <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed bottom-[-10%] right-[-10%] w-[30%] h-[40%] bg-indigo-300/10 rounded-full blur-[100px] pointer-events-none" />
 
-          {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto mt-2">
-            {filteredMenu.map((item) => (
+      {/* Floating Top Navbar (Apple Glass) */}
+      <header className="fixed top-4 left-4 right-4 z-50 flex items-center justify-between px-4 sm:px-8 py-2 apple-glass rounded-[2rem] shadow-sm transform transition-all duration-300 ease-in-out">
+        
+        {/* Logo & Brand */}
+        <div className="flex items-center gap-2 group cursor-pointer transition-transform hover:scale-105 active:scale-95" onClick={() => router.push('/')}>
+          <div className="bg-transparent rounded-full flex items-center justify-center p-0.5">
+            <Image src="/logo.png" alt="Logo" width={34} height={34} className="object-contain drop-shadow-sm" priority />
+          </div>
+          <div>
+            <h1 className="text-[15px] font-extrabold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent font-heading tracking-tight leading-none">Simondu</h1>
+            <p className="text-[9px] uppercase tracking-widest text-slate-500 font-bold leading-none mt-0.5">Polda Jabar</p>
+          </div>
+        </div>
+
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center space-x-1 p-1 bg-slate-200/40 rounded-full border border-white/50 backdrop-blur-md">
+          {filteredMenu.map((item) => {
+            const isActive = pathname === item.href
+            return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-250 group",
-                  pathname === item.href
-                    ? "bg-blue-600/15 text-blue-400 font-semibold shadow-[0_0_12px_rgba(37,99,235,0.1)]"
-                    : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                  "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300",
+                  isActive
+                    ? "bg-white text-slate-900 shadow-sm border border-slate-100/50"
+                    : "text-slate-500 hover:text-slate-800 hover:bg-white/40"
                 )}
                 data-testid={`menu-${item.label.toLowerCase().replace(' ', '-')}`}
               >
-                <item.icon className={cn(
-                  "h-5 w-5 flex-shrink-0 transition-transform duration-250 group-hover:scale-110",
-                  pathname === item.href ? "text-blue-500" : "text-slate-500 group-hover:text-slate-300"
-                )} />
-                {sidebarOpen && <span>{item.label}</span>}
+                <item.icon className={cn("h-4 w-4 transition-transform duration-300", isActive ? "scale-110 text-blue-600" : "")} />
+                <span>{item.label}</span>
               </Link>
-            ))}
-          </nav>
+            )
+          })}
+        </nav>
 
-          {/* User Info */}
-          <div className="p-4 m-4 rounded-2xl bg-slate-900 border border-slate-800/80">
-            {sidebarOpen && (
-              <div className="mb-4">
-                <p className="text-sm font-bold text-white tracking-wide">{user.name}</p>
-                <p className="text-xs text-slate-400 mt-0.5 truncate">{user.email}</p>
-                {user.unit_name && (
-                  <Badge className="mt-2 text-[10px] bg-slate-800 text-slate-300 pointer-events-none hover:bg-slate-800 border-none">
-                    {user.unit_name}
-                  </Badge>
-                )}
-              </div>
+        {/* Right Actions: User & Notifications */}
+        <div className="flex items-center gap-3">
+          {/* Notification Bell */}
+          <button className="relative p-2 rounded-full hover:bg-slate-200/50 text-slate-600 transition-colors" data-testid="notification-bell">
+            <Bell className="h-5 w-5" />
+            {notificationCount > 0 && (
+              <Badge variant="destructive" className="absolute top-0 right-0 h-4 w-4 flex items-center justify-center p-0 text-[10px] bg-red-500 text-white border-none shadow-sm animate-pulse">
+                {notificationCount > 9 ? '9+' : notificationCount}
+              </Badge>
             )}
-            <Button
-              onClick={handleLogout}
-              variant="destructive"
-              size={sidebarOpen ? "default" : "icon"}
-              className="w-full bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 border-none rounded-xl"
-              data-testid="logout-button"
-            >
-              {sidebarOpen ? 'Keluar Log' : 'X'}
-            </Button>
+          </button>
+
+          {/* User Profile Pill */}
+          <div className="hidden sm:flex items-center gap-3 pl-3 pr-1 py-1 bg-white/60 border border-white/40 rounded-full shadow-sm hover:bg-white transition-colors cursor-pointer group">
+            <div className="flex flex-col items-end">
+              <span className="text-xs font-bold text-slate-800 leading-tight">{user.name}</span>
+              <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider leading-tight">{user.role}</span>
+            </div>
+            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-inner font-bold text-sm">
+              {user.name.charAt(0).toUpperCase()}
+            </div>
           </div>
+
+          <Button 
+            onClick={handleLogout} 
+            variant="ghost" 
+            size="icon" 
+            className="text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
+            title="Keluar"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+
+          {/* Mobile Menu Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="md:hidden text-slate-600 hover:bg-slate-200/50 rounded-full"
+          >
+            {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
         </div>
-      </aside>
+      </header>
 
-      {/* Main Content */}
-      <div
-        className={cn(
-          "flex-1 flex flex-col transition-all duration-300 bg-slate-50/50",
-          sidebarOpen ? "lg:ml-64" : "lg:ml-20"
-        )}
-      >
-        {/* Header */}
-        <header className="sticky top-0 z-40 flex items-center justify-between h-20 px-8 bg-white/80 backdrop-blur-md border-b border-slate-200/60 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-          <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent font-heading tracking-tight">Dashboard</h1>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <button
-              className="relative p-2 hover:bg-muted rounded-lg transition-colors"
-              data-testid="notification-bell"
-            >
-              <Bell className="h-5 w-5" />
-              {notificationCount > 0 && (
-                <Badge 
-                  variant="destructive" 
-                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+      {/* Mobile Navigation Dropdown (Apple Glass) */}
+      {sidebarOpen && (
+        <div className="md:hidden fixed top-20 left-4 right-4 z-40 apple-glass rounded-2xl shadow-xl border border-white/40 p-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <nav className="flex flex-col space-y-1">
+            {filteredMenu.map((item) => {
+              const isActive = pathname === item.href
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all",
+                    isActive
+                      ? "bg-blue-600/10 text-blue-700"
+                      : "text-slate-600 hover:bg-slate-100"
+                  )}
                 >
-                  {notificationCount > 9 ? '9+' : notificationCount}
-                </Badge>
-              )}
-            </button>
-          </div>
-        </header>
+                  <item.icon className={cn("h-5 w-5", isActive ? "text-blue-600" : "text-slate-400")} />
+                  {item.label}
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
+      )}
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-auto p-6" data-testid="main-content">
-          {children}
-        </main>
-      </div>
+      {/* Main Content Area */}
+      <main className="flex-1 w-full max-w-7xl mx-auto pt-24 px-4 sm:px-6 lg:px-8 pb-12 z-10 transition-all duration-300" data-testid="main-content">
+        {children}
+      </main>
     </div>
   )
 }

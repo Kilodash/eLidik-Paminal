@@ -28,6 +28,23 @@
     --radius: 1rem;
   }
 
+  /* Apple Style Additions */
+  .apple-glass {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+  }
+
+  .apple-glass-dark {
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  }
+
   .dark {
     --background: 15 23 42;
     --foreground: 248 250 252;
@@ -37,17 +54,17 @@
     --popover-foreground: 248 250 252;
     --primary: 30 58 138;
     --primary-foreground: 255 255 255;
-    --secondary: 234 179 8;
+    --secondary: 0 0% 96%;
     --secondary-foreground: 15 23 42;
     --muted: 51 65 85;
     --muted-foreground: 148 163 184;
-    --accent: 234 179 8;
+    --accent: 0 0% 96%;
     --accent-foreground: 15 23 42;
     --destructive: 239 68 68;
     --destructive-foreground: 255 255 255;
     --border: 51 65 85;
     --input: 51 65 85;
-    --ring: 234 179 8;
+    --ring: 210 40% 96%;
   }
   
   * {
@@ -56,15 +73,15 @@
   
   /* UI UX Pro Max: Soft UI Evolution */
   body {
-    background-color: hsl(var(--background));
+    background-color: #f5f5f7;
     color: hsl(var(--foreground));
     font-family: 'Inter', sans-serif;
   }
 
   .card, input, button, a {
-    transition-property: color, background-color, border-color, box-shadow, transform;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 250ms;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+    transition-duration: 300ms;
   }
   
   h1, h2, h3, h4, h5, h6 {

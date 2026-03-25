@@ -38,10 +38,26 @@ JWT_EXPIRATION_MINUTES = int(os.environ.get("JWT_EXPIRATION_MINUTES", "480"))
 
 # ==================== DB HELPERS ====================
 
+from psycopg2 import pool as pg_pool
+
+# Connection pool
+db_pool = None
+
+def init_pool():
+    global db_pool
+    if db_pool is None:
+        db_pool = pg_pool.ThreadedConnectionPool(1, 10, DATABASE_URL)
+    return db_pool
+
 def get_db():
-    conn = psycopg2.connect(DATABASE_URL)
+    p = init_pool()
+    conn = p.getconn()
     conn.autocommit = False
     return conn
+
+def release_db(conn):
+    p = init_pool()
+    p.putconn(conn)
 
 def serialize_row(row, columns):
     """Convert a database row to a dict with proper JSON serialization"""
@@ -68,7 +84,7 @@ def query_all(sql, params=None):
         cur.close()
         return [serialize_row(r, columns) for r in rows]
     finally:
-        conn.close()
+        release_db(conn)
 
 def query_one(sql, params=None):
     conn = get_db()
@@ -83,7 +99,7 @@ def query_one(sql, params=None):
         cur.close()
         return serialize_row(row, columns) if row else None
     finally:
-        conn.close()
+        release_db(conn)
 
 def execute(sql, params=None):
     conn = get_db()
@@ -102,7 +118,7 @@ def execute(sql, params=None):
         conn.rollback()
         raise e
     finally:
-        conn.close()
+        release_db(conn)
 
 # ==================== AUTH ====================
 
@@ -440,7 +456,7 @@ def merge_dumas(req: MergeDumas, user=Depends(require_role("admin", "superadmin"
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        conn.close()
+        release_db(conn)
 
 # --- ARCHIVE / TRASH (Superadmin) ---
 @app.get("/api/archive/dumas")
@@ -477,7 +493,7 @@ def permanent_delete_dumas(dumas_id: str, user=Depends(require_role("superadmin"
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        conn.close()
+        release_db(conn)
 
 # --- TINDAK LANJUT ---
 @app.get("/api/tindak-lanjut")
@@ -704,27 +720,113 @@ def mark_all_notifications_read(user=Depends(get_current_user)):
         cur.close()
         return {"message": "Semua notifikasi ditandai telah dibaca"}
     finally:
-        conn.close()
+        release_db(conn)
 
 # --- DASHBOARD STATS ---
 @app.get("/api/dashboard/stats")
 def dashboard_stats(user=Depends(get_current_user)):
-    total = query_one("SELECT COUNT(*) as count FROM dumas WHERE deleted_at IS NULL")
-    dalam_proses = query_one("SELECT COUNT(*) as count FROM dumas WHERE status = 'dalam_proses' AND deleted_at IS NULL")
-    terbukti = query_one("SELECT COUNT(*) as count FROM dumas WHERE status = 'terbukti' AND deleted_at IS NULL")
-    tidak_terbukti = query_one("SELECT COUNT(*) as count FROM dumas WHERE status = 'tidak_terbukti' AND deleted_at IS NULL")
-    
-    menunggu_verifikasi = query_one(
-        "SELECT COUNT(*) as count FROM tindak_lanjut WHERE status_verifikasi = 'menunggu_verifikasi' AND deleted_at IS NULL"
-    )
-    
-    return {
-        "total": total["count"] if total else 0,
-        "dalam_proses": dalam_proses["count"] if dalam_proses else 0,
-        "terbukti": terbukti["count"] if terbukti else 0,
-        "tidak_terbukti": tidak_terbukti["count"] if tidak_terbukti else 0,
-        "menunggu_verifikasi": menunggu_verifikasi["count"] if menunggu_verifikasi else 0
-    }
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        # All stats in one query
+        cur.execute("""
+            SELECT 
+                COUNT(*) FILTER (WHERE deleted_at IS NULL) as total,
+                COUNT(*) FILTER (WHERE status = 'dalam_proses' AND deleted_at IS NULL) as dalam_proses,
+                COUNT(*) FILTER (WHERE status = 'terbukti' AND deleted_at IS NULL) as terbukti,
+                COUNT(*) FILTER (WHERE status = 'tidak_terbukti' AND deleted_at IS NULL) as tidak_terbukti
+            FROM dumas
+        """)
+        cols = [d[0] for d in cur.description]
+        row = cur.fetchone()
+        stats = serialize_row(row, cols) if row else {}
+        
+        cur.execute("SELECT COUNT(*) as count FROM tindak_lanjut WHERE status_verifikasi = 'menunggu_verifikasi' AND deleted_at IS NULL")
+        tl_row = cur.fetchone()
+        
+        cur.close()
+        return {
+            "total": stats.get("total", 0),
+            "dalam_proses": stats.get("dalam_proses", 0),
+            "terbukti": stats.get("terbukti", 0),
+            "tidak_terbukti": stats.get("tidak_terbukti", 0),
+            "menunggu_verifikasi": tl_row[0] if tl_row else 0
+        }
+    finally:
+        release_db(conn)
+
+@app.get("/api/dashboard/combined")
+def dashboard_all(user=Depends(get_current_user)):
+    """Combined dashboard endpoint - returns stats, sla, and chart data in one call"""
+    conn = get_db()
+    try:
+        cur = conn.cursor()
+        
+        # Stats
+        cur.execute("""
+            SELECT 
+                COUNT(*) FILTER (WHERE deleted_at IS NULL) as total,
+                COUNT(*) FILTER (WHERE status = 'dalam_proses' AND deleted_at IS NULL) as dalam_proses,
+                COUNT(*) FILTER (WHERE status = 'terbukti' AND deleted_at IS NULL) as terbukti,
+                COUNT(*) FILTER (WHERE status = 'tidak_terbukti' AND deleted_at IS NULL) as tidak_terbukti
+            FROM dumas
+        """)
+        cols = [d[0] for d in cur.description]
+        stats_row = cur.fetchone()
+        stats = serialize_row(stats_row, cols) if stats_row else {}
+        
+        cur.execute("SELECT COUNT(*) FROM tindak_lanjut WHERE status_verifikasi = 'menunggu_verifikasi' AND deleted_at IS NULL")
+        tl_count = cur.fetchone()[0]
+        
+        # SLA Warning
+        cur.execute("""
+            SELECT d.id, d.no_dumas, d.pelapor, d.terlapor, d.satker, d.status, d.created_at,
+                u.name as unit_name,
+                EXTRACT(DAY FROM NOW() - d.created_at)::int as days_elapsed,
+                CASE 
+                    WHEN EXTRACT(DAY FROM NOW() - d.created_at) > 30 THEN 'merah'
+                    WHEN EXTRACT(DAY FROM NOW() - d.created_at) > 14 THEN 'kuning'
+                    ELSE 'hijau'
+                END as sla_status
+            FROM dumas d LEFT JOIN users u ON d.unit_id = u.id
+            WHERE d.status = 'dalam_proses' AND d.deleted_at IS NULL
+            ORDER BY d.created_at ASC
+        """)
+        sla_cols = [d[0] for d in cur.description]
+        sla_rows = cur.fetchall()
+        sla_data = [serialize_row(r, sla_cols) for r in sla_rows]
+        
+        # Chart Data
+        cur.execute("""
+            SELECT 
+                TO_CHAR(created_at, 'YYYY-MM') as month,
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE status = 'dalam_proses') as dalam_proses,
+                COUNT(*) FILTER (WHERE status = 'terbukti') as terbukti,
+                COUNT(*) FILTER (WHERE status = 'tidak_terbukti') as tidak_terbukti
+            FROM dumas WHERE deleted_at IS NULL
+            GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+            ORDER BY month DESC LIMIT 12
+        """)
+        chart_cols = [d[0] for d in cur.description]
+        chart_rows = cur.fetchall()
+        chart_data = [serialize_row(r, chart_cols) for r in chart_rows]
+        
+        cur.close()
+        
+        return {
+            "stats": {
+                "total": stats.get("total", 0),
+                "dalam_proses": stats.get("dalam_proses", 0),
+                "terbukti": stats.get("terbukti", 0),
+                "tidak_terbukti": stats.get("tidak_terbukti", 0),
+                "menunggu_verifikasi": tl_count or 0,
+            },
+            "sla_data": sla_data,
+            "chart_data": chart_data,
+        }
+    finally:
+        release_db(conn)
 
 @app.get("/api/dashboard/sla-warning")
 def sla_warning(user=Depends(get_current_user)):
@@ -784,7 +886,7 @@ def get_auto_number(doc_type: str, tanggal: Optional[str] = None, unit: Optional
 
 # --- DOCUMENT GENERATION ---
 @app.get("/api/documents/{doc_type}/{dumas_id}")
-def generate_document(doc_type: str, dumas_id: str, user=Depends(get_current_user)):
+def generate_document(doc_type: str, dumas_id: str, token: Optional[str] = None, user=Depends(get_current_user)):
     """Generate .docx document for UUK, Sprin, SP2HP2, etc."""
     from docx import Document
     from docx.shared import Pt, Inches, Cm

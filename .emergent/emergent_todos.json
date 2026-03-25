@@ -1,22 +1,6 @@
 [
   {
-    "content": "Phase 1: Setup database connection to Supabase PostgreSQL",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 1: Create database tables/migrations + seed data (9 users + settings)",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 1: Implement JWT auth (login, protected routes, RBAC)",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 1: Core endpoints (dumas CRUD, tindak_lanjut, approval workflow, notifications)",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 1: Document generation (.docx) endpoint",
+    "content": "Phase 1: Setup database + seed data + auth + core endpoints - ALL DONE",
     "status": "completed"
   },
   {
@@ -24,19 +8,35 @@
     "status": "completed"
   },
   {
-    "content": "Phase 2: Get Design Guidelines from Design Agent",
-    "status": "in_progress"
+    "content": "Phase 2: Design Agent + Full App Development",
+    "status": "completed"
   },
   {
-    "content": "Phase 2: Full App Development (Backend + Frontend)",
-    "status": "pending"
+    "content": "Phase 2: Dashboard page with stats, chart, SLA monitoring",
+    "status": "completed"
   },
   {
-    "content": "Phase 2: All user stories covered in Development",
-    "status": "pending"
+    "content": "Phase 2: Dumas List + Create + Detail pages",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Approval Inbox page",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Settings + Archive pages",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Layout (Sidebar desktop, Bottom Nav mobile)",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Notification bell with Supabase realtime",
+    "status": "completed"
   },
   {
     "content": "Phase 2: End to End Testing using Testing Agent",
-    "status": "pending"
+    "status": "in_progress"
   }
 ]

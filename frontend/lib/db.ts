@@ -6,9 +6,9 @@ let pool: Pool | null = null
 export function getPool(): Pool {
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: process.env.DATABASE_URL ? process.env.DATABASE_URL.replace('?sslmode=require', '') : '',
       ssl: {
-        rejectUnauthorized: false
+        rejectUnauthorized: false,
       },
       max: 20,
       idleTimeoutMillis: 30000,

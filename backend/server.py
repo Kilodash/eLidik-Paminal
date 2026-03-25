@@ -387,7 +387,7 @@ def create_dumas(req: DumasCreate, user=Depends(require_role("admin", "superadmi
          req.status or "dalam_proses",
          req.parent_dumas_id if req.parent_dumas_id else None)
     )
-    return result
+    return Response(content=json.dumps(result, default=str), status_code=201, media_type="application/json")
 
 @app.get("/api/dumas/{dumas_id}")
 def get_dumas(dumas_id: str, user=Depends(get_current_user)):

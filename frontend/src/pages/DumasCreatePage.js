@@ -60,8 +60,9 @@ export default function DumasCreatePage() {
       const payload = { ...form };
       if (!payload.unit_id) delete payload.unit_id;
       const res = await api.post('/dumas', payload);
+      const data = res.data;
       toast.success('Dumas berhasil diregistrasi');
-      navigate(`/dumas/${res.data.id}`);
+      navigate(`/dumas/${data.id}`);
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Gagal menyimpan');
     } finally {

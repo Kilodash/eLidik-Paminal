@@ -1,55 +1,23 @@
 [
   {
-    "content": "Build API Routes: Dashboard (stats, charts, SLA monitoring)",
-    "status": "completed"
-  },
-  {
-    "content": "Build API Routes: Dumas CRUD + bulk actions (merge, delete)",
-    "status": "completed"
-  },
-  {
-    "content": "Build API Routes: Tindak Lanjut dengan workflow approval",
-    "status": "completed"
-  },
-  {
-    "content": "Build API Routes: Settings (master data CRUD)",
-    "status": "completed"
-  },
-  {
-    "content": "Build API Routes: Anggota, Templates, Audit Log",
-    "status": "completed"
-  },
-  {
-    "content": "Build UI: Login page dengan Police theme",
-    "status": "in_progress"
-  },
-  {
-    "content": "Build UI: Collapsible sidebar layout dengan notification system",
-    "status": "pending"
-  },
-  {
-    "content": "Build UI: Dashboard dengan charts dan stat cards",
-    "status": "pending"
-  },
-  {
     "content": "Build UI: Daftar Dumas dengan bulk actions dan search",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build UI: Registrasi Dumas form dengan dynamic fields",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build UI: Detail Dumas dan Tindak Lanjut form dengan conditional rendering",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build UI: Pengaturan module (Master Data, Anggota, Template, Audit Log)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build UI: Arsip/Trash module untuk soft-deleted items",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Implementasi Realtime notifications dengan Supabase",

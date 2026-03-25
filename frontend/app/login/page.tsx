@@ -66,17 +66,17 @@ export default function LoginPage() {
           <p className="text-slate-300">Sistem Monitoring Dumas - Subbid Paminal Bidpropam Polda Jabar</p>
         </div>
 
-        <Card className="shadow-2xl">
+        <Card className="shadow-2xl bg-white border-none">
           <CardHeader>
-            <CardTitle className="text-2xl font-heading">Login</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-2xl font-heading text-slate-900">Login</CardTitle>
+            <CardDescription className="text-slate-600">
               Masuk dengan akun yang telah terdaftar
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" data-testid="login-email-label">Email</Label>
+                <Label htmlFor="email" data-testid="login-email-label" className="text-slate-800 font-semibold">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -85,12 +85,12 @@ export default function LoginPage() {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
                   data-testid="login-email-input"
-                  className="focus:ring-2 focus:ring-primary"
+                  className="bg-slate-50 text-slate-900 border-slate-300 focus:ring-2 focus:ring-blue-600"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" data-testid="login-password-label">Password</Label>
+                <Label htmlFor="password" data-testid="login-password-label" className="text-slate-800 font-semibold">Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -99,7 +99,7 @@ export default function LoginPage() {
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
                   data-testid="login-password-input"
-                  className="focus:ring-2 focus:ring-primary"
+                  className="bg-slate-50 text-slate-900 border-slate-300 focus:ring-2 focus:ring-blue-600"
                 />
               </div>
 

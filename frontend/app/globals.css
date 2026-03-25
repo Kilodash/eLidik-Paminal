@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Chivo:wght@400;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 248 250 252; /* slate-50 */
+    --foreground: 15 23 42; /* slate-900 */
+    --card: 255 255 255;
+    --card-foreground: 15 23 42;
+    --popover: 255 255 255;
+    --popover-foreground: 15 23 42;
+    --primary: 30 58 138; /* blue-900 - Navy Blue */
+    --primary-foreground: 255 255 255;
+    --secondary: 234 179 8; /* yellow-500 - Gold/Yellow */
+    --secondary-foreground: 15 23 42;
+    --muted: 241 245 249; /* slate-100 */
+    --muted-foreground: 100 116 139; /* slate-500 */
+    --accent: 234 179 8; /* yellow-500 */
+    --accent-foreground: 15 23 42;
+    --destructive: 239 68 68; /* red-500 */
+    --destructive-foreground: 255 255 255;
+    --border: 226 232 240; /* slate-200 */
+    --input: 226 232 240;
+    --ring: 30 58 138; /* blue-900 */
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 15 23 42; /* slate-900 */
+    --foreground: 248 250 252;
+    --card: 30 41 59; /* slate-800 */
+    --card-foreground: 248 250 252;
+    --popover: 30 41 59;
+    --popover-foreground: 248 250 252;
+    --primary: 30 58 138;
+    --primary-foreground: 255 255 255;
+    --secondary: 234 179 8;
+    --secondary-foreground: 15 23 42;
+    --muted: 51 65 85; /* slate-700 */
+    --muted-foreground: 148 163 184; /* slate-400 */
+    --accent: 234 179 8;
+    --accent-foreground: 15 23 42;
+    --destructive: 239 68 68;
+    --destructive-foreground: 255 255 255;
+    --border: 51 65 85;
+    --input: 51 65 85;
+    --ring: 234 179 8;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

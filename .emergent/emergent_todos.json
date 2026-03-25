@@ -1,22 +1,82 @@
 [
   {
-    "content": "Phase 1: Setup database + seed data + auth + core endpoints - ALL DONE",
+    "content": "Setup Supabase client dan connection utilities",
     "status": "completed"
   },
   {
-    "content": "Phase 1: POC test script - 74/74 tests passed",
+    "content": "Buat fresh database schema di Supabase sesuai requirement lengkap",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Full App Development - ALL PAGES BUILT",
+    "content": "Seed database dengan 9 default users dan master data",
     "status": "completed"
   },
   {
-    "content": "Phase 2: End to End Testing - 92% pass rate",
-    "status": "completed"
+    "content": "Build API Routes: Auth (login, me) dengan JWT",
+    "status": "in_progress"
   },
   {
-    "content": "Phase 2: Minor fix - create dumas returns 201",
-    "status": "completed"
+    "content": "Build API Routes: Dashboard (stats, charts, SLA monitoring)",
+    "status": "pending"
+  },
+  {
+    "content": "Build API Routes: Dumas CRUD + bulk actions (merge, delete)",
+    "status": "pending"
+  },
+  {
+    "content": "Build API Routes: Tindak Lanjut dengan workflow approval",
+    "status": "pending"
+  },
+  {
+    "content": "Build API Routes: Settings (master data CRUD)",
+    "status": "pending"
+  },
+  {
+    "content": "Build API Routes: Anggota, Templates, Audit Log",
+    "status": "pending"
+  },
+  {
+    "content": "Build UI: Login page dengan Police theme",
+    "status": "pending"
+  },
+  {
+    "content": "Build UI: Collapsible sidebar layout dengan notification system",
+    "status": "pending"
+  },
+  {
+    "content": "Build UI: Dashboard dengan charts dan stat cards",
+    "status": "pending"
+  },
+  {
+    "content": "Build UI: Daftar Dumas dengan bulk actions dan search",
+    "status": "pending"
+  },
+  {
+    "content": "Build UI: Registrasi Dumas form dengan dynamic fields",
+    "status": "pending"
+  },
+  {
+    "content": "Build UI: Detail Dumas dan Tindak Lanjut form dengan conditional rendering",
+    "status": "pending"
+  },
+  {
+    "content": "Build UI: Pengaturan module (Master Data, Anggota, Template, Audit Log)",
+    "status": "pending"
+  },
+  {
+    "content": "Build UI: Arsip/Trash module untuk soft-deleted items",
+    "status": "pending"
+  },
+  {
+    "content": "Implementasi Realtime notifications dengan Supabase",
+    "status": "pending"
+  },
+  {
+    "content": "Testing menyeluruh dengan testing_agent",
+    "status": "pending"
+  },
+  {
+    "content": "Verifikasi deployment readiness untuk Vercel",
+    "status": "pending"
   }
 ]

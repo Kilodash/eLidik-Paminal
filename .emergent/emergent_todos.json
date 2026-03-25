@@ -1,34 +1,38 @@
 [
   {
     "content": "Phase 1: Setup database connection to Supabase PostgreSQL",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Phase 1: Create database tables/migrations + seed data (9 users + settings)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Phase 1: Implement JWT auth (login, protected routes, RBAC)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Phase 1: Core endpoints (dumas CRUD, tindak_lanjut, approval workflow, notifications)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Phase 1: Document generation (.docx) endpoint",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 1: POC test script - 74/74 tests passed",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Get Design Guidelines from Design Agent",
+    "status": "in_progress"
+  },
+  {
+    "content": "Phase 2: Full App Development (Backend + Frontend)",
     "status": "pending"
   },
   {
-    "content": "Phase 1: POC test script - test all core flows",
-    "status": "pending"
-  },
-  {
-    "content": "Phase 1: Fix POC until all tests pass",
-    "status": "pending"
-  },
-  {
-    "content": "Phase 2: Design Agent + Full App Development",
+    "content": "Phase 2: All user stories covered in Development",
     "status": "pending"
   },
   {

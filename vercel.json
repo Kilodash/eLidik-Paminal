@@ -1,7 +1,6 @@
-"{
-  \"version\": 2,
-  \"buildCommand\": \"cd frontend && yarn build\",
-  \"installCommand\": \"cd frontend && yarn install\",
-  \"framework\": null
+{
+  "version": 2,
+  "buildCommand": "cd frontend && yarn build",
+  "installCommand": "cd frontend && yarn install",
+  "framework": null
 }
-"

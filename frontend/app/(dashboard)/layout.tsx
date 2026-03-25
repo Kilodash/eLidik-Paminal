@@ -82,59 +82,62 @@ export default function DashboardLayout({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 transition-all duration-300 bg-primary text-primary-foreground",
-          sidebarOpen ? "w-64" : "w-0 lg:w-16"
+          "fixed inset-y-0 left-0 z-50 transition-all duration-300 bg-slate-950 border-r border-slate-800 text-slate-100",
+          sidebarOpen ? "w-64" : "w-0 lg:w-20"
         )}
         data-testid="sidebar"
       >
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full shadow-[4px_0_24px_rgba(0,0,0,0.1)]">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-primary-foreground/20">
+          <div className="flex items-center justify-between p-5 border-b border-slate-800/60">
             {sidebarOpen && (
-              <div>
-                <h2 className="text-xl font-bold font-heading">Simondu Web</h2>
-                <p className="text-xs text-primary-foreground/70">Paminal Propam</p>
+              <div className="flex-1">
+                <h2 className="text-xl font-bold font-heading tracking-tight bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">Simondu Web</h2>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mt-0.5">Paminal Propam</p>
               </div>
             )}
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="text-primary-foreground hover:bg-primary-foreground/10"
+              className="text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
               data-testid="sidebar-toggle"
             >
-              {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5 mx-auto" />}
             </Button>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto mt-2">
             {filteredMenu.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                  "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-250 group",
                   pathname === item.href
-                    ? "bg-primary-foreground/20 text-primary-foreground font-medium"
-                    : "text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                    ? "bg-blue-600/15 text-blue-400 font-semibold shadow-[0_0_12px_rgba(37,99,235,0.1)]"
+                    : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
                 )}
                 data-testid={`menu-${item.label.toLowerCase().replace(' ', '-')}`}
               >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
+                <item.icon className={cn(
+                  "h-5 w-5 flex-shrink-0 transition-transform duration-250 group-hover:scale-110",
+                  pathname === item.href ? "text-blue-500" : "text-slate-500 group-hover:text-slate-300"
+                )} />
                 {sidebarOpen && <span>{item.label}</span>}
               </Link>
             ))}
           </nav>
 
           {/* User Info */}
-          <div className="p-4 border-t border-primary-foreground/20">
+          <div className="p-4 m-4 rounded-2xl bg-slate-900 border border-slate-800/80">
             {sidebarOpen && (
-              <div className="mb-3">
-                <p className="text-sm font-medium text-primary-foreground">{user.name}</p>
-                <p className="text-xs text-primary-foreground/70">{user.email}</p>
+              <div className="mb-4">
+                <p className="text-sm font-bold text-white tracking-wide">{user.name}</p>
+                <p className="text-xs text-slate-400 mt-0.5 truncate">{user.email}</p>
                 {user.unit_name && (
-                  <Badge variant="secondary" className="mt-1 text-xs">
+                  <Badge className="mt-2 text-[10px] bg-slate-800 text-slate-300 pointer-events-none hover:bg-slate-800 border-none">
                     {user.unit_name}
                   </Badge>
                 )}
@@ -142,12 +145,12 @@ export default function DashboardLayout({
             )}
             <Button
               onClick={handleLogout}
-              variant="secondary"
+              variant="destructive"
               size={sidebarOpen ? "default" : "icon"}
-              className="w-full"
+              className="w-full bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 border-none rounded-xl"
               data-testid="logout-button"
             >
-              {sidebarOpen ? 'Logout' : 'X'}
+              {sidebarOpen ? 'Keluar Log' : 'X'}
             </Button>
           </div>
         </div>
@@ -156,14 +159,14 @@ export default function DashboardLayout({
       {/* Main Content */}
       <div
         className={cn(
-          "flex-1 flex flex-col transition-all duration-300",
-          sidebarOpen ? "lg:ml-64" : "lg:ml-16"
+          "flex-1 flex flex-col transition-all duration-300 bg-slate-50/50",
+          sidebarOpen ? "lg:ml-64" : "lg:ml-20"
         )}
       >
         {/* Header */}
-        <header className="sticky top-0 z-40 flex items-center justify-between h-16 px-6 bg-background border-b shadow-sm">
+        <header className="sticky top-0 z-40 flex items-center justify-between h-20 px-8 bg-white/80 backdrop-blur-md border-b border-slate-200/60 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
           <div>
-            <h1 className="text-2xl font-bold text-foreground font-heading">Dashboard</h1>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent font-heading tracking-tight">Dashboard</h1>
           </div>
           
           <div className="flex items-center gap-4">

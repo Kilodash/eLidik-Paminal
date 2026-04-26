@@ -32,7 +32,7 @@ export default function DumasListPage() {
   const [dumas, setDumas] = useState<Dumas[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, total_pages: 0 })
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export default function DumasListPage() {
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
         ...(search && { search }),
-        ...(statusFilter && { status: statusFilter })
+        ...(statusFilter && statusFilter !== 'all' && { status: statusFilter })
       })
 
       const response = await fetch(`/api/dumas?${params}`, {
@@ -153,7 +153,7 @@ export default function DumasListPage() {
                 <SelectValue placeholder="Semua Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Semua Status</SelectItem>
+                <SelectItem value="all">Semua Status</SelectItem>
                 <SelectItem value="dalam_proses">Dalam Proses</SelectItem>
                 <SelectItem value="terbukti">Terbukti</SelectItem>
                 <SelectItem value="tidak_terbukti">Tidak Terbukti</SelectItem>

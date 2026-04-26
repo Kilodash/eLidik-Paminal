@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image' // Added next/image import
-import { Home, FileText, PlusCircle, Settings, Archive, Menu, X, Bell } from 'lucide-react'
+import { Home, FileText, PlusCircle, Settings, Archive, Menu, X, Bell, DollarSign, ClipboardList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -25,8 +25,10 @@ export default function DashboardLayout({
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [notificationCount, setNotificationCount] = useState(0)
+  const [redirecting, setRedirecting] = useState(false)
 
   useEffect(() => {
     // Check authentication
@@ -34,14 +36,24 @@ export default function DashboardLayout({
     const userData = localStorage.getItem('user')
 
     if (!token || !userData) {
+      setRedirecting(true)
       router.push('/login')
       return
     }
 
-    setUser(JSON.parse(userData))
-
-    // Fetch notification count
-    fetchNotificationCount(token)
+    try {
+      const parsed = JSON.parse(userData)
+      setUser(parsed)
+      setAuthChecked(true)
+      // Fetch notification count
+      fetchNotificationCount(token)
+    } catch {
+      // userData corrupt – clear and redirect
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      setRedirecting(true)
+      router.push('/login')
+    }
   }, [])
 
   const fetchNotificationCount = async (token: string) => {
@@ -66,16 +78,28 @@ export default function DashboardLayout({
     { href: '/', icon: Home, label: 'Dashboard', roles: ['all'] },
     { href: '/dumas', icon: FileText, label: 'Daftar Dumas', roles: ['all'] },
     { href: '/dumas/create', icon: PlusCircle, label: 'Registrasi Dumas', roles: ['admin', 'superadmin'] },
+    { href: '/kegiatan/baru', icon: ClipboardList, label: 'Kegiatan Baru', roles: ['all'] },
+    { href: '/perwabkeu', icon: DollarSign, label: 'Perwabkeu', roles: ['admin', 'superadmin'] },
     { href: '/pengaturan', icon: Settings, label: 'Pengaturan', roles: ['admin', 'superadmin'] },
     { href: '/arsip', icon: Archive, label: 'Arsip', roles: ['admin', 'superadmin'] },
   ]
 
-  const filteredMenu = menuItems.filter(item => 
+  const filteredMenu = menuItems.filter(item =>
     item.roles.includes('all') || item.roles.includes(user?.role || '')
   )
 
-  if (!user) {
-    return null
+  // Show spinner while checking auth OR while redirecting to login
+  if (!authChecked || redirecting || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin" />
+          <p className="text-sm text-slate-500 font-medium">
+            {redirecting ? 'Mengarahkan ke halaman login...' : 'Memuat sistem...'}
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (

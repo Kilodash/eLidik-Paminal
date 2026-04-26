@@ -40,8 +40,8 @@ export default function LoginPage() {
 
       toast.success('Login berhasil!')
       
-      // Redirect to dashboard
-      router.push('/')
+      // Redirect to dashboard using window.location to ensure fresh mount and localStorage read
+      window.location.href = '/'
     } catch (error: any) {
       toast.error(error.message || 'Terjadi kesalahan')
     } finally {

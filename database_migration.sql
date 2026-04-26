@@ -72,6 +72,7 @@ CREATE TABLE dumas (
     parent_dumas_id UUID REFERENCES dumas(id), -- For merged dumas
     sla_days INTEGER DEFAULT 0, -- Auto-calculated
     is_archived BOOLEAN DEFAULT FALSE,
+    context_ai JSONB DEFAULT '{}'::jsonb, -- AI SIADIDEMENBABI Extraction context
     deleted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -307,6 +308,152 @@ CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON settings FOR EACH ROW
 CREATE TRIGGER update_anggota_updated_at BEFORE UPDATE ON anggota FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_document_templates_updated_at BEFORE UPDATE ON document_templates FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- =============================================
+-- PERWABKEU MODULE TABLES (Financial Support)
+-- =============================================
+
+CREATE TABLE master_pejabat (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  peran VARCHAR(100) NOT NULL, -- e.g., 'KABID', 'KASUBBID'
+  nama VARCHAR(255) NOT NULL,
+  pangkat VARCHAR(100) NOT NULL,
+  nrp_nip VARCHAR(100) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE master_dipa (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  jenis_giat VARCHAR(255) NOT NULL,
+  pagu_anggaran NUMERIC NOT NULL DEFAULT 0,
+  tarif_uh_dk NUMERIC NOT NULL DEFAULT 0,
+  tarif_uh_lk NUMERIC NOT NULL DEFAULT 0,
+  tarif_akomodasi_pa NUMERIC NOT NULL DEFAULT 0,
+  tarif_akomodasi_ba NUMERIC NOT NULL DEFAULT 0,
+  kuota_orang INTEGER NOT NULL DEFAULT 0,
+  kuota_hari INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE dipa_rencana_bulanan (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id_dipa UUID REFERENCES master_dipa(id) ON DELETE CASCADE,
+  bulan INTEGER NOT NULL CHECK (bulan BETWEEN 1 AND 12),
+  anggaran_bulan NUMERIC NOT NULL DEFAULT 0,
+  tarif_uh_dk NUMERIC NOT NULL DEFAULT 0,
+  tarif_uh_lk NUMERIC NOT NULL DEFAULT 0,
+  tarif_akomodasi_pa NUMERIC NOT NULL DEFAULT 0,
+  tarif_akomodasi_ba NUMERIC NOT NULL DEFAULT 0,
+  kuota_orang INTEGER NOT NULL DEFAULT 0,
+  kuota_hari INTEGER NOT NULL DEFAULT 0,
+  kuota_hari_lk INTEGER NOT NULL DEFAULT 0,
+  kuota_kamar_pa INTEGER NOT NULL DEFAULT 0,
+  kuota_kamar_ba INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE kegiatan_induk (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  dumas_id UUID REFERENCES dumas(id) ON DELETE SET NULL, -- Link to Dumas if applicable
+  jenis_giat VARCHAR(255) NOT NULL, 
+  lokasi VARCHAR(50) NOT NULL, -- 'DK' or 'LK'
+  tgl_mulai DATE NOT NULL,
+  tgl_selesai DATE NOT NULL,
+  tgl_sprin DATE,
+  nomor_sprin VARCHAR(255),
+  tempat_tujuan TEXT,
+  tujuan TEXT NOT NULL,
+  dasar_giat TEXT,
+  status VARCHAR(100) DEFAULT 'draft',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE kegiatan_personel (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id_kegiatan UUID REFERENCES kegiatan_induk(id) ON DELETE CASCADE,
+  id_personel UUID REFERENCES anggota(id) ON DELETE CASCADE, -- Merged with eLidik's anggota table
+  is_ketua_tim BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Apply triggers to Perwabkeu tables
+CREATE TRIGGER update_master_pejabat_updated_at BEFORE UPDATE ON master_pejabat FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_master_dipa_updated_at BEFORE UPDATE ON master_dipa FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_dipa_rencana_bulanan_updated_at BEFORE UPDATE ON dipa_rencana_bulanan FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_kegiatan_induk_updated_at BEFORE UPDATE ON kegiatan_induk FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- FUNCTIONS FOR PERWABKEU INTEGRATION
+-- =============================================
+
+CREATE OR REPLACE FUNCTION upsert_kegiatan_with_personel(
+  p_id UUID,
+  p_jenis_giat VARCHAR,
+  p_lokasi VARCHAR,
+  p_tgl_mulai DATE,
+  p_tgl_selesai DATE,
+  p_tgl_sprin DATE,
+  p_nomor_sprin VARCHAR,
+  p_tempat_tujuan TEXT,
+  p_tujuan TEXT,
+  p_dasar_giat TEXT,
+  p_status VARCHAR,
+  p_personel_list JSONB
+) RETURNS UUID AS $$
+DECLARE
+  v_kegiatan_id UUID;
+  v_person_record JSONB;
+BEGIN
+  IF p_id IS NULL THEN
+    -- Insert new kegiatan
+    INSERT INTO kegiatan_induk (
+      jenis_giat, lokasi, tgl_mulai, tgl_selesai, tgl_sprin, nomor_sprin, tempat_tujuan, tujuan, dasar_giat, status
+    ) VALUES (
+      p_jenis_giat, p_lokasi, p_tgl_mulai, p_tgl_selesai, p_tgl_sprin, p_nomor_sprin, p_tempat_tujuan, p_tujuan, p_dasar_giat, p_status
+    ) RETURNING id INTO v_kegiatan_id;
+  ELSE
+    -- Update existing kegiatan
+    UPDATE kegiatan_induk SET
+      jenis_giat = p_jenis_giat,
+      lokasi = p_lokasi,
+      tgl_mulai = p_tgl_mulai,
+      tgl_selesai = p_tgl_selesai,
+      tgl_sprin = p_tgl_sprin,
+      nomor_sprin = p_nomor_sprin,
+      tempat_tujuan = p_tempat_tujuan,
+      tujuan = p_tujuan,
+      dasar_giat = p_dasar_giat,
+      status = p_status,
+      updated_at = NOW()
+    WHERE id = p_id;
+    
+    v_kegiatan_id := p_id;
+    
+    -- Delete existing personnel
+    DELETE FROM kegiatan_personel WHERE id_kegiatan = v_kegiatan_id;
+  END IF;
+
+  -- Insert new personnel list safely
+  IF p_personel_list IS NOT NULL AND jsonb_typeof(p_personel_list) = 'array' AND jsonb_array_length(p_personel_list) > 0 THEN
+    FOR v_person_record IN SELECT * FROM jsonb_array_elements(p_personel_list)
+    LOOP
+      INSERT INTO kegiatan_personel (id_kegiatan, id_personel, is_ketua_tim)
+      VALUES (
+        v_kegiatan_id,
+        (v_person_record->>'id_personel')::UUID,
+        COALESCE((v_person_record->>'is_ketua_tim')::BOOLEAN, false)
+      );
+    END LOOP;
+  END IF;
+
+  RETURN v_kegiatan_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Final original SLA logic
 -- Function to calculate SLA days
 CREATE OR REPLACE FUNCTION calculate_sla_days()
 RETURNS TRIGGER AS $$

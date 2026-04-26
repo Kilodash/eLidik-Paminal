@@ -1,21 +1,21 @@
 import { Pool } from 'pg'
 
 // Connection pool untuk PostgreSQL
-let pool: Pool | null = null
+const globalForPg = global as unknown as { pool: Pool }
 
 export function getPool(): Pool {
-  if (!pool) {
-    pool = new Pool({
+  if (!globalForPg.pool) {
+    globalForPg.pool = new Pool({
       connectionString: process.env.DATABASE_URL ? process.env.DATABASE_URL.replace('?sslmode=require', '') : '',
       ssl: {
         rejectUnauthorized: false,
       },
-      max: 20,
+      max: 10, // Reduce max connections per pool logic
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
+      connectionTimeoutMillis: 5000,
     })
   }
-  return pool
+  return globalForPg.pool
 }
 
 export async function query(text: string, params?: any[]) {

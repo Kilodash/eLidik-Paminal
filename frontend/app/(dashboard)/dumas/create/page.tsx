@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Brain, Upload, FileText, Loader2, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 
 export default function CreateDumasPage() {
@@ -27,8 +27,67 @@ export default function CreateDumasPage() {
     disposisi_kabid: '',
     disposisi_kasubbid: '',
     unit_id: '',
-    unit_name: ''
+    unit_name: '',
+    context_ai: null as any
   })
+
+  // AI states
+  const [analyzingAi, setAnalyzingAi] = useState(false)
+  const [aiInputMode, setAiInputMode] = useState<'pdf' | 'text'>('pdf')
+  const [aiText, setAiText] = useState('')
+  const [aiFile, setAiFile] = useState<File | null>(null)
+
+  const handleAnalyzeAi = async () => {
+    if (aiInputMode === 'text' && !aiText.trim()) return;
+    if (aiInputMode === 'pdf' && !aiFile) return;
+
+    setAnalyzingAi(true)
+    try {
+      const token = localStorage.getItem('token')
+      let res;
+      if (aiInputMode === 'text') {
+        res = await fetch('/api/ai/analyze-dumas/text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ text: aiText })
+        })
+      } else {
+        const _formData = new FormData()
+        _formData.append('file', aiFile!)
+        res = await fetch('/api/ai/analyze-dumas/pdf', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: _formData
+        })
+      }
+
+      const data = await res.json()
+      
+      if (!res.ok) {
+         throw new Error(data.error || 'Gagal menganalisa dokumen')
+      }
+      
+      setFormData(prev => ({
+        ...prev,
+        context_ai: {
+          siapa: data.siapa || '',
+          apa: data.apa || '',
+          dimana: data.dimana || '',
+          dengan_apa: data.dengan_apa || '',
+          menggunakan_apa: data.menggunakan_apa || '',
+          bagaimana: data.bagaimana || '',
+          bilamana: data.bilamana || '',
+        },
+        keterangan: prev.keterangan ? prev.keterangan : (data.raw_text || data.apa || ''),
+      }))
+      
+      toast.success('Analisis AI berhasil! Data telah diekstrak.')
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setAnalyzingAi(false)
+    }
+  }
 
   useEffect(() => {
     fetchSettings()
@@ -97,6 +156,90 @@ export default function CreateDumasPage() {
         <h1 className="text-3xl font-bold font-heading">Registrasi Dumas</h1>
         <p className="text-muted-foreground mt-1">Buat pengaduan baru</p>
       </div>
+
+      <Card className="mb-6 border-blue-200 shadow-sm bg-blue-50/10">
+        <CardHeader className="bg-blue-50/50 pb-4 border-b border-blue-100">
+          <CardTitle className="flex items-center text-blue-800">
+            <Brain className="mr-2 h-5 w-5" />
+            AI Intelligence: Analisis Pengaduan
+          </CardTitle>
+          <CardDescription className="text-slate-600">
+            Unggah dokumen pengaduan (PDF) atau paste teks untuk mengekstrak informasi 7 unsur (SIADIDEMENBABI) secara otomatis.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="flex gap-4 mb-4">
+            <Button 
+              type="button" 
+              variant={aiInputMode === 'pdf' ? 'default' : 'outline'} 
+              className={aiInputMode === 'pdf' ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}
+              onClick={() => setAiInputMode('pdf')}
+              size="sm"
+            >
+              <FileText className="mr-2 h-4 w-4"/> Dokumen PDF
+            </Button>
+            <Button 
+              type="button" 
+              variant={aiInputMode === 'text' ? 'default' : 'outline'} 
+              className={aiInputMode === 'text' ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}
+              onClick={() => setAiInputMode('text')}
+              size="sm"
+            >
+              <Upload className="mr-2 h-4 w-4"/> Teks Langsung
+            </Button>
+          </div>
+          
+          {aiInputMode === 'pdf' ? (
+            <div className="space-y-4">
+              <div className="border-2 border-dashed border-blue-200 rounded-lg p-6 flex justify-center items-center flex-col bg-white hover:border-blue-300 transition-colors">
+                <Input 
+                  type="file" 
+                  accept=".pdf" 
+                  className="max-w-sm mb-2" 
+                  onChange={(e) => setAiFile(e.target.files?.[0] || null)}
+                />
+                <p className="text-sm text-gray-500">Maksimal 10MB. Hanya format PDF.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <Textarea 
+                placeholder="Paste teks pengaduan (atau hasil transkrip lisan) di sini..." 
+                rows={6}
+                value={aiText}
+                onChange={(e) => setAiText(e.target.value)}
+                className="bg-white resize-y"
+              />
+            </div>
+          )}
+          
+          <div className="mt-4">
+            <Button type="button" onClick={handleAnalyzeAi} disabled={analyzingAi || (aiInputMode === 'pdf' ? !aiFile : !aiText.trim())} className="w-full md:w-auto bg-blue-700 hover:bg-blue-800 text-white">
+              {analyzingAi ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Menganalisa Dokumen...</> : <><Brain className="mr-2 h-4 w-4"/> Mulai Analisa AI</>}
+            </Button>
+          </div>
+
+          {formData.context_ai && (
+            <div className="mt-6 border border-green-200 rounded-lg bg-green-50/50 p-4 animate-in fade-in zoom-in duration-300">
+              <h4 className="font-semibold text-green-800 flex items-center mb-3">
+                <CheckCircle2 className="mr-2 h-5 w-5 text-green-600"/>
+                Hasil Ekstraksi SIADIDEMENBABI
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                {Object.entries(formData.context_ai).map(([key, val]) => (
+                  <div key={key} className="space-y-1">
+                    <span className="font-semibold text-green-700 uppercase drop-shadow-sm">{key.replace('_', ' ')}:</span>
+                    <p className="text-slate-800 bg-white p-2.5 rounded-md border border-green-100 min-h-[40px] shadow-sm whitespace-pre-wrap">{val as string || '-'}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-xs text-green-600 italic">
+                * Hasil ini telah disimpan ke dalam memori aplikasi dan akan diteruskan ke panel UUK untuk penyusunan Dokumen Penyelidikan (SPRIN, LHP, dll).
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <form onSubmit={handleSubmit}>
         <Card>

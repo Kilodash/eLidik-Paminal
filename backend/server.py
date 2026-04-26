@@ -9,13 +9,14 @@ import psycopg2.extras
 from psycopg2 import pool as pg_pool
 import bcrypt
 import jwt
-from fastapi import FastAPI, HTTPException, Depends, Header, Response, Query
+from fastapi import FastAPI, HTTPException, Depends, Header, Response, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from io import BytesIO
-
+from pypdf import PdfReader
+from ai_engine import ai_engine
 load_dotenv()
 
 app = FastAPI(title="Simondu Web API", version="2.0.0")
@@ -165,6 +166,9 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class AIDumasTextReq(BaseModel):
+    keterangan: str
+
 class DumasCreate(BaseModel):
     no_dumas: Optional[str] = None
     tgl_dumas: Optional[str] = None
@@ -179,6 +183,7 @@ class DumasCreate(BaseModel):
     unit_id: Optional[str] = None
     status: Optional[str] = "dalam_proses"
     parent_dumas_id: Optional[str] = None
+    context_ai: Optional[dict] = None
 
 class DumasUpdate(BaseModel):
     no_dumas: Optional[str] = None
@@ -194,6 +199,7 @@ class DumasUpdate(BaseModel):
     unit_id: Optional[str] = None
     status: Optional[str] = None
     parent_dumas_id: Optional[str] = None
+    context_ai: Optional[dict] = None
 
 class TindakLanjutUpsert(BaseModel):
     dumas_id: str
@@ -410,13 +416,14 @@ def count_dumas(status: Optional[str] = None, search: Optional[str] = None, user
 def create_dumas(req: DumasCreate, user=Depends(require_role("admin", "superadmin"))):
     result = execute(
         """INSERT INTO dumas (no_dumas, tgl_dumas, pelapor, terlapor, satker, wujud_perbuatan,
-           jenis_dumas, keterangan, disposisi_kabid, disposisi_kasubbid, unit_id, status, parent_dumas_id)
-           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *""",
+           jenis_dumas, keterangan, disposisi_kabid, disposisi_kasubbid, unit_id, status, parent_dumas_id, context_ai)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb) RETURNING *""",
         (req.no_dumas, req.tgl_dumas, req.pelapor, req.terlapor, req.satker,
          req.wujud_perbuatan, req.jenis_dumas, req.keterangan,
          req.disposisi_kabid, req.disposisi_kasubbid,
          req.unit_id if req.unit_id else None, req.status or "dalam_proses",
-         req.parent_dumas_id if req.parent_dumas_id else None)
+         req.parent_dumas_id if req.parent_dumas_id else None,
+         json.dumps(req.context_ai) if req.context_ai else '{}')
     )
     log_audit(user, f"Menambahkan Dumas {req.no_dumas or 'baru'}", "dumas", result.get("id") if result else None)
     return Response(content=json.dumps(result, default=str), status_code=201, media_type="application/json")
@@ -437,9 +444,13 @@ def update_dumas(dumas_id: str, req: DumasUpdate, user=Depends(get_current_user)
     for key, value in data.items():
         if key in ("unit_id", "parent_dumas_id"):
             updates.append(f"{key} = %s::uuid")
+            params.append(value)
+        elif key == "context_ai":
+            updates.append(f"{key} = %s::jsonb")
+            params.append(json.dumps(value))
         else:
             updates.append(f"{key} = %s")
-        params.append(value)
+            params.append(value)
     if not updates:
         raise HTTPException(status_code=400, detail="Tidak ada data")
     updates.append("updated_at = NOW()")
@@ -486,6 +497,42 @@ def bulk_dumas_action(req: BulkDumasAction, user=Depends(require_role("admin", "
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         release_db(conn)
+
+# --- AI ANALYSIS ---
+@app.post("/api/ai/analyze-dumas/text")
+async def ai_analyze_dumas_text(req: AIDumasTextReq, user=Depends(get_current_user)):
+    result = await ai_engine.analyze_dumas(req.keterangan)
+    if "error" in result and result["error"] != "GEMINI_API_KEY not configured":
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
+
+@app.post("/api/ai/analyze-dumas/pdf")
+async def ai_analyze_dumas_pdf(file: UploadFile = File(...), user=Depends(get_current_user)):
+    try:
+        if not file.filename.endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="File harus berupa PDF")
+            
+        file_bytes = await file.read()
+        reader = PdfReader(BytesIO(file_bytes))
+        
+        extracted_text = ""
+        for page in reader.pages:
+            text = page.extract_text()
+            if text:
+                extracted_text += text + "\n"
+                
+        if not extracted_text.strip():
+            raise HTTPException(status_code=400, detail="Tidak dapat mengekstrak teks dari PDF ini")
+            
+        result = await ai_engine.analyze_dumas(extracted_text)
+        if "error" in result and result["error"] != "GEMINI_API_KEY not configured":
+            raise HTTPException(status_code=500, detail=result["error"])
+            
+        # Kembalikan juga teks mentahnya agar pengguna bisa mengecek ulang
+        result["raw_text"] = extracted_text 
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- ARCHIVE ---
 @app.get("/api/archive/dumas")

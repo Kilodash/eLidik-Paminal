@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
-import { Plus, FileText, FolderOpen, TrendingUp, Clock, AlertTriangle, Inbox } from 'lucide-react'
+import { Plus, FileText, FolderOpen, TrendingUp, Clock, AlertTriangle, Inbox, Handshake } from 'lucide-react'
 import Link from 'next/link'
 
 function StatCard({ label, value, href, icon: Icon, color }: {
@@ -62,6 +62,35 @@ export default async function DashboardPage() {
   const anevJenis = await getAnevJenis(unitId)
   const anevUnit = isAdmin ? await getAnevUnit() : null
 
+  const formatPercent = (val: number, total: number): string => {
+    if (total === 0 || isNaN(val / total)) return '0,0%'
+    const pct = (val / total) * 100
+    return pct.toFixed(1).replace('.', ',') + '%'
+  }
+
+  const grandTotalJumlah = anevUnit ? anevUnit.reduce((sum, item) => sum + item.jumlah, 0) : 0
+
+  const grandTotal = anevUnit ? anevUnit.reduce((acc, a) => {
+    acc.jumlah += a.jumlah
+    acc.proses += a.proses
+    acc.diterima += a.diterima
+    acc.pulbaket += a.pulbaket
+    acc.gelar += a.gelar
+    acc.selesai += a.selesai
+    acc.terbukti += a.terbukti
+    acc.tidak_terbukti += a.tidak_terbukti
+    return acc
+  }, {
+    jumlah: 0,
+    proses: 0,
+    diterima: 0,
+    pulbaket: 0,
+    gelar: 0,
+    selesai: 0,
+    terbukti: 0,
+    tidak_terbukti: 0,
+  }) : null
+
   const kelengkapan: Array<{ berkas_id: string; nomor_berkas: string; status: string; unit_nama: string; missing_docs: string[] }> = []
   if (isAdmin || unitId) {
     const tenantId = await requireTenant()
@@ -109,10 +138,11 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Total Dumas" value={stats.total} href="/pengaduan" icon={Inbox} color="bg-primary" />
         <StatCard label="Dalam Proses" value={stats.proses} href={`/pengaduan?status=${PROSES_STATUSES.join(',')}`} icon={TrendingUp} color="bg-amber-500" />
         <StatCard label="Selesai" value={stats.selesai} href={`/pengaduan?status=${SELESAI_STATUSES.join(',')}`} icon={FileText} color="bg-emerald-500" />
+        <StatCard label="Perdamaian" value={stats.perdamaian} href="/pengaduan?status=perdamaian" icon={Handshake} color="bg-teal-500" />
         <StatCard label="SLA Terlambat" value={0} href="/pengaduan?overdue=true" icon={Clock} color="bg-red-500" />
       </div>
 
@@ -200,37 +230,62 @@ export default async function DashboardPage() {
       </Card>
 
       {/* Anev Kinerja Unit */}
-      {anevUnit && (
+      {anevUnit && grandTotal && (
         <Card className="border-0 ring-1 ring-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Anev Kinerja Unit</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm stripe-table">
+            <div className="rounded-lg border overflow-x-auto">
+              <table className="w-full text-xs md:text-sm stripe-table min-w-[900px]">
                 <thead>
                   <tr className="bg-primary/5">
-                    <th className="text-left p-3 font-semibold text-primary">Unit</th>
+                    <th className="text-left p-3 font-semibold text-primary">Unit / UR</th>
                     <th className="text-right p-3 font-semibold text-primary">Jumlah</th>
+                    <th className="text-right p-3 font-semibold text-primary">%</th>
                     <th className="text-right p-3 font-semibold text-primary">Proses</th>
+                    <th className="text-right p-3 font-semibold text-primary">%</th>
+                    <th className="text-right p-3 font-semibold text-primary">Diterima</th>
+                    <th className="text-right p-3 font-semibold text-primary">Pulbaket</th>
+                    <th className="text-right p-3 font-semibold text-primary">Gelar</th>
                     <th className="text-right p-3 font-semibold text-primary">Selesai</th>
+                    <th className="text-right p-3 font-semibold text-primary">%</th>
                     <th className="text-right p-3 font-semibold text-primary">Terbukti</th>
                     <th className="text-right p-3 font-semibold text-primary">Tdk Terbukti</th>
-                    <th className="text-right p-3 font-semibold text-primary">%</th>
                   </tr>
                 </thead>
                 <tbody>
                   {anevUnit.map((a) => (
-                    <tr key={a.unit_id} className="border-t">
+                    <tr key={a.unit_id} className="border-t hover:bg-muted/50 transition-colors">
                       <td className="p-3 font-medium">{a.unit}</td>
                       <td className="p-3 text-right font-semibold">{a.jumlah}</td>
-                      <td className="p-3 text-right">{a.proses}</td>
-                      <td className="p-3 text-right">{a.selesai}</td>
+                      <td className="p-3 text-right text-muted-foreground">{formatPercent(a.jumlah, grandTotalJumlah)}</td>
+                      <td className="p-3 text-right font-semibold text-amber-600">{a.proses}</td>
+                      <td className="p-3 text-right text-amber-600/80">{formatPercent(a.proses, a.jumlah)}</td>
+                      <td className="p-3 text-right">{a.diterima}</td>
+                      <td className="p-3 text-right">{a.pulbaket}</td>
+                      <td className="p-3 text-right">{a.gelar}</td>
+                      <td className="p-3 text-right font-semibold text-emerald-600">{a.selesai}</td>
+                      <td className="p-3 text-right text-emerald-600/80">{formatPercent(a.selesai, a.jumlah)}</td>
                       <td className="p-3 text-right">{a.terbukti}</td>
                       <td className="p-3 text-right">{a.tidak_terbukti}</td>
-                      <td className="p-3 text-right font-medium">{a.persen_selesai}%</td>
                     </tr>
                   ))}
+                  {/* Summary/Total Row */}
+                  <tr className="border-t-2 border-primary/20 bg-primary/5 font-semibold">
+                    <td className="p-3 text-left">JUMLAH</td>
+                    <td className="p-3 text-right font-bold">{grandTotal.jumlah}</td>
+                    <td className="p-3 text-right text-muted-foreground">100,0%</td>
+                    <td className="p-3 text-right font-bold text-amber-600">{grandTotal.proses}</td>
+                    <td className="p-3 text-right text-amber-600">{formatPercent(grandTotal.proses, grandTotal.jumlah)}</td>
+                    <td className="p-3 text-right">{grandTotal.diterima}</td>
+                    <td className="p-3 text-right">{grandTotal.pulbaket}</td>
+                    <td className="p-3 text-right">{grandTotal.gelar}</td>
+                    <td className="p-3 text-right font-bold text-emerald-600">{grandTotal.selesai}</td>
+                    <td className="p-3 text-right text-emerald-600">{formatPercent(grandTotal.selesai, grandTotal.jumlah)}</td>
+                    <td className="p-3 text-right">{grandTotal.terbukti}</td>
+                    <td className="p-3 text-right">{grandTotal.tidak_terbukti}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>

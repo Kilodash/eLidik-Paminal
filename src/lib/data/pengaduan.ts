@@ -11,7 +11,7 @@ export async function getPengaduanList(filters: SearchFilters = {}) {
 
   let query = supabase
     .from('pengaduan')
-    .select('*, klasifikasi(nama), unit:organizations(nama)', { count: 'exact' })
+    .select('*, klasifikasi(nama), unit:organizations(nama), pengaduan_terlapor(terlapor(nama)), berkas:berkas(id, nomor_berkas)', { count: 'exact' })
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
     .range((page - 1) * limit, page * limit - 1)
@@ -21,6 +21,8 @@ export async function getPengaduanList(filters: SearchFilters = {}) {
   }
   if (filters.status?.length) {
     query = query.in('status', filters.status)
+  } else {
+    query = query.neq('status', 'dibatalkan')
   }
   if (filters.unitId) {
     query = query.eq('unit_id', filters.unitId)
@@ -66,7 +68,8 @@ export async function createPengaduan(data: Partial<Pengaduan> & { terlapor_nama
   // Generate register number
   const tahun = new Date(data.tgl_pengaduan || new Date()).getFullYear()
   const bulan = new Date(data.tgl_pengaduan || new Date()).getMonth() + 1
-  const prefix = data.jenis === 'laporan_informasi' ? 'LI' : 'REG'
+  const isLI = data.jenis?.toUpperCase() === 'LAPORAN_INFORMASI' || data.jenis?.toUpperCase() === 'LAPORAN INFORMASI'
+  const prefix = isLI ? 'LI' : 'REG'
 
   const { data: reg } = await supabase
     .from('document_registers')
@@ -113,11 +116,14 @@ export async function createPengaduan(data: Partial<Pengaduan> & { terlapor_nama
       .select()
       .single()
 
-    if (!terlaporError && terlaporData) {
-      await supabase.from('pengaduan_terlapor').insert({
+    if (terlaporError) throw terlaporError
+
+    if (terlaporData) {
+      const { error: relInsertError } = await supabase.from('pengaduan_terlapor').insert({
         pengaduan_id: inserted.id,
         terlapor_id: terlaporData.id
       })
+      if (relInsertError) throw relInsertError
     }
   }
 
@@ -135,20 +141,170 @@ export async function createPengaduan(data: Partial<Pengaduan> & { terlapor_nama
   return inserted
 }
 
-export async function updatePengaduan(id: string, data: Partial<Pengaduan>) {
+export async function updatePengaduan(id: string, data: Partial<Pengaduan & { terlapor_nama?: string }>) {
   const supabase = await createClient()
   const tenantId = await requireTenant()
 
+  const { terlapor_nama, ...pengaduanData } = data
+
   const { data: updated, error } = await supabase
     .from('pengaduan')
-    .update(data)
+    .update(pengaduanData)
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .select()
     .single()
 
   if (error) throw error
+
+  if (terlapor_nama !== undefined) {
+    // Cari relasi terlapor yang ada
+    const { data: existingRelation } = await supabase
+      .from('pengaduan_terlapor')
+      .select('terlapor_id, terlapor!inner(id, nama)')
+      .eq('pengaduan_id', id)
+      .maybeSingle()
+
+    if (existingRelation) {
+      // Update nama terlapor
+      const { error: terlaporUpdateError } = await supabase
+        .from('terlapor')
+        .update({ nama: terlapor_nama })
+        .eq('id', existingRelation.terlapor_id)
+        .eq('tenant_id', tenantId)
+      if (terlaporUpdateError) throw terlaporUpdateError
+    } else if (terlapor_nama) {
+      // Buat baru jika belum ada dan ada input
+      const { data: newTerlapor, error: terlaporCreateError } = await supabase
+        .from('terlapor')
+        .insert({
+          tenant_id: tenantId,
+          nama: terlapor_nama,
+          status_identitas: 'diketahui'
+        })
+        .select()
+        .single()
+      
+      if (terlaporCreateError) throw terlaporCreateError
+      
+      if (newTerlapor) {
+        const { error: relInsertError } = await supabase.from('pengaduan_terlapor').insert({
+          pengaduan_id: id,
+          terlapor_id: newTerlapor.id
+        })
+        if (relInsertError) throw relInsertError
+      }
+    }
+  }
+
   return updated
+}
+
+export async function deletePengaduan(id: string, alasan: string, userId: string) {
+  const supabase = await createClient()
+  const tenantId = await requireTenant()
+
+  const { data: current } = await supabase
+    .from('pengaduan')
+    .select('status')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
+
+  const statusLama = current?.status || 'diterima'
+
+  const { data, error } = await supabase
+    .from('pengaduan')
+    .update({ status: 'dibatalkan' })
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  await supabase.from('status_history').insert({
+    tenant_id: tenantId,
+    ref_type: 'pengaduan',
+    ref_id: id,
+    status_lama: statusLama,
+    status_baru: 'dibatalkan',
+    catatan: alasan,
+    user_id: userId
+  })
+
+  return data
+}
+
+export async function mergePengaduanToBerkas(berkasId: string, pengaduanId: string) {
+  const supabase = await createClient()
+  const tenantId = await requireTenant()
+
+  const { data: berkas } = await supabase
+    .from('berkas')
+    .select('nomor_berkas')
+    .eq('id', berkasId)
+    .eq('tenant_id', tenantId)
+    .single()
+
+  if (!berkas) throw new Error('Berkas tidak ditemukan')
+
+  const { data, error } = await supabase
+    .from('pengaduan')
+    .update({ berkas_id: berkasId })
+    .eq('id', pengaduanId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  await supabase.from('audit_logs').insert({
+    tenant_id: tenantId,
+    action: 'UPDATE',
+    entity_type: 'pengaduan',
+    entity_id: pengaduanId,
+    summary: `Pengaduan digabungkan ke berkas ${berkas.nomor_berkas}`,
+    new_values: { berkas_id: berkasId }
+  })
+
+  return data
+}
+
+export async function splitPengaduanFromBerkas(pengaduanId: string) {
+  const supabase = await createClient()
+  const tenantId = await requireTenant()
+
+  const { data: prev } = await supabase
+    .from('pengaduan')
+    .select('berkas_id, berkas:berkas(nomor_berkas)')
+    .eq('id', pengaduanId)
+    .eq('tenant_id', tenantId)
+    .single()
+
+  if (!prev || !prev.berkas_id) throw new Error('Pengaduan tidak terhubung ke berkas mana pun')
+
+  const { data, error } = await supabase
+    .from('pengaduan')
+    .update({ berkas_id: null })
+    .eq('id', pengaduanId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  const nomorBerkas = (prev.berkas as unknown as Array<{ nomor_berkas: string }>)?.[0]?.nomor_berkas || 'unknown'
+  await supabase.from('audit_logs').insert({
+    tenant_id: tenantId,
+    action: 'UPDATE',
+    entity_type: 'pengaduan',
+    entity_id: pengaduanId,
+    summary: `Pengaduan dipisahkan dari berkas ${nomorBerkas}`,
+    new_values: { berkas_id: null }
+  })
+
+  return data
 }
 
 async function getTenantKode(tenantId: string): Promise<string> {
@@ -180,6 +336,7 @@ export async function getDashboardStats(unitId?: string) {
     selesai: data?.filter(d => selesaiStatuses.includes(d.status)).length || 0,
     terbukti: data?.filter(d => d.status === 'terbukti').length || 0,
     tidak_terbukti: data?.filter(d => d.status === 'tidak_terbukti').length || 0,
+    perdamaian: data?.filter(d => d.status === 'perdamaian').length || 0,
   }
 }
 
@@ -211,35 +368,90 @@ export async function getAnevJenis(unitId?: string) {
   }))
 }
 
-export async function getAnevUnit() {
+export async function getAnevUnit(): Promise<Array<{
+  unit: string;
+  unit_id: string;
+  jumlah: number;
+  proses: number;
+  diterima: number;
+  pulbaket: number;
+  gelar: number;
+  selesai: number;
+  terbukti: number;
+  tidak_terbukti: number;
+}>> {
   const supabase = await createClient()
   const tenantId = await requireTenant()
 
-  const { data } = await supabase
+  const { data: orgs, error: orgsError } = await supabase
+    .from('organizations')
+    .select('id, nama')
+    .eq('tenant_id', tenantId)
+    .eq('tipe', 'unit')
+    .order('nama')
+
+  if (orgsError) throw orgsError
+
+  const { data: dumas, error: dumasError } = await supabase
     .from('pengaduan')
-    .select('unit_id, status, unit:organizations!inner(nama)')
+    .select('unit_id, status')
     .eq('tenant_id', tenantId)
 
-  if (!data) return []
+  if (dumasError) throw dumasError
 
-  const grouped: Record<string, { unit: string; unit_id: string; jumlah: number; proses: number; selesai: number; terbukti: number; tidak_terbukti: number }> = {}
+  const grouped: Record<string, {
+    unit: string;
+    unit_id: string;
+    jumlah: number;
+    proses: number;
+    diterima: number;
+    pulbaket: number;
+    gelar: number;
+    selesai: number;
+    terbukti: number;
+    tidak_terbukti: number;
+  }> = {}
 
-  for (const row of data) {
-    const org = row.unit as unknown as { nama: string }
-    const uid = row.unit_id || 'no-unit'
-    const name = org.nama || 'Tanpa Unit'
-    const key = uid
-
-    if (!grouped[key]) grouped[key] = { unit: name, unit_id: uid, jumlah: 0, proses: 0, selesai: 0, terbukti: 0, tidak_terbukti: 0 }
-    grouped[key].jumlah++
-    if (['registrasi', 'verifikasi', 'disposisi', 'lidik_berjalan', 'gelar'].includes(row.status)) grouped[key].proses++
-    if (['closed', 'terbukti', 'tidak_terbukti'].includes(row.status)) grouped[key].selesai++
-    if (row.status === 'terbukti') grouped[key].terbukti++
-    if (row.status === 'tidak_terbukti') grouped[key].tidak_terbukti++
+  for (const org of (orgs || [])) {
+    grouped[org.id] = {
+      unit: org.nama,
+      unit_id: org.id,
+      jumlah: 0,
+      proses: 0,
+      diterima: 0,
+      pulbaket: 0,
+      gelar: 0,
+      selesai: 0,
+      terbukti: 0,
+      tidak_terbukti: 0
+    }
   }
 
-  return Object.values(grouped).map(g => ({
-    ...g,
-    persen_selesai: g.jumlah > 0 ? Math.round((g.selesai / g.jumlah) * 100) : 0,
-  }))
+  for (const row of (dumas || [])) {
+    const uid = row.unit_id
+    if (!uid || !grouped[uid]) continue
+
+    grouped[uid].jumlah++
+
+    // Proses Statuses
+    if (['diterima', 'registrasi', 'verifikasi', 'disposisi'].includes(row.status)) {
+      grouped[uid].diterima++
+      grouped[uid].proses++
+    } else if (['lidik_berjalan', 'lidik_selesai'].includes(row.status)) {
+      grouped[uid].pulbaket++
+      grouped[uid].proses++
+    } else if (row.status === 'gelar') {
+      grouped[uid].gelar++
+      grouped[uid].proses++
+    }
+
+    // Selesai Statuses
+    if (['closed', 'terbukti', 'tidak_terbukti', 'perdamaian'].includes(row.status)) {
+      grouped[uid].selesai++
+      if (row.status === 'terbukti') grouped[uid].terbukti++
+      if (row.status === 'tidak_terbukti') grouped[uid].tidak_terbukti++
+    }
+  }
+
+  return Object.values(grouped)
 }

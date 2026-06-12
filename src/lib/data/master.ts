@@ -1,6 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireTenant } from '@/lib/auth'
-import type { Klasifikasi, Organization, WilayahSatker } from '@/types'
+import type { Klasifikasi, Organization, WilayahSatker, JenisPengaduan } from '@/types'
+
+export async function getJenisPengaduanList(): Promise<JenisPengaduan[]> {
+  const supabase = await createClient()
+  const tenantId = await requireTenant()
+
+  const { data } = await supabase
+    .from('jenis_pengaduan')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('nama')
+
+  return (data || []) as JenisPengaduan[]
+}
 
 export async function getKlasifikasiList(): Promise<Klasifikasi[]> {
   const supabase = await createClient()

@@ -35,6 +35,7 @@ const pengaturanItems = [
   { href: '/pengaturan/organisasi', label: 'Organisasi', icon: Building2 },
   { href: '/pengaturan/personel', label: 'Personel', icon: Users },
   { href: '/pengaturan/wilayah', label: 'Wilayah / Satker', icon: MapPin },
+  { href: '/pengaturan/jenis-pengaduan', label: 'Jenis Pengaduan', icon: Tags },
   { href: '/pengaturan/klasifikasi', label: 'Klasifikasi', icon: Tags },
   { href: '/pengaturan/variabel', label: 'Variabel Dokumen', icon: Variable },
   { href: '/pengaturan/sistem', label: 'Sistem Lain', icon: Wrench },

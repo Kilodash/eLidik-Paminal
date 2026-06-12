@@ -8,6 +8,7 @@ ALTER TABLE tenants ADD COLUMN IF NOT EXISTS alamat TEXT;
 ALTER TABLE personel DROP CONSTRAINT IF EXISTS personel_pkey CASCADE;
 ALTER TABLE personel ADD PRIMARY KEY (id);
 ALTER TABLE personel ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE personel ALTER COLUMN id SET NOT NULL;
 
 -- Step 2: tambah user_id untuk link ke auth.users (opsional)
 ALTER TABLE personel ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);

@@ -3,22 +3,70 @@ import { getUser, getPersonel } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Shield } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SetupForm } from './setup-form'
 
 export default async function SetupPage() {
-  const user = await getUser()
-  if (!user) redirect('/login')
-
-  const personel = await getPersonel()
-  if (personel) redirect('/')
-
   const admin = createAdminClient()
 
-  const { data: tenants } = await admin.from('tenants').select('id, kode, nama').order('nama')
-  const { data: units } = await admin.from('organizations').select('id, nama').order('nama')
+  // We no longer require user to be logged in to access setup
+  // because setup is now the registration form for the first admin AND tenant
+
+  async function handleRegister(fd: FormData) {
+    'use server'
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    const admin = createAdminClient()
+
+    const email = fd.get('email') as string
+    const password = fd.get('password') as string
+    
+    const tenantNama = fd.get('tenant_nama') as string
+    const tenantKode = (fd.get('tenant_kode') as string).toUpperCase()
+    const tenantAlamat = fd.get('tenant_alamat') as string
+
+    // 1. Create tenant record
+    const { data: tenantData, error: tenantErr } = await admin.from('tenants').insert({
+      nama: tenantNama,
+      kode: tenantKode,
+      alamat: tenantAlamat
+    }).select().single()
+
+    if (tenantErr || !tenantData) {
+      console.error('Create tenant error:', tenantErr)
+      return { error: 'Gagal membuat instansi. Kode mungkin sudah dipakai.' }
+    }
+
+    // 2. Create auth user
+    const { data: authData, error: authErr } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    })
+
+    if (authErr || !authData.user) {
+      console.error('Create user error:', authErr)
+      // rollback tenant
+      await admin.from('tenants').delete().eq('id', tenantData.id)
+      return { error: authErr?.message || 'Gagal membuat akun admin' }
+    }
+
+    // 3. Create personel record
+    // We must manually generate an UUID for id because Supabase auth.users FK split left the table without default UUID generator active on existing column
+    // Note: Since schema cache doesn't recognize user_id right now, we fallback to id = authData.user.id
+    const { error: dbErr } = await admin.from('personel').insert({
+      id: authData.user.id,
+      tenant_id: tenantData.id,
+      role: fd.get('role') as string,
+      nama_lengkap: fd.get('nama_lengkap') as string,
+    })
+    
+    if (dbErr) {
+      console.error('Create personel error:', dbErr)
+      // Cleanup auth user and tenant if db insert fails
+      await admin.auth.admin.deleteUser(authData.user.id)
+      await admin.from('tenants').delete().eq('id', tenantData.id)
+      return { error: 'Gagal menyimpan data personel' }
+    }
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-background to-blue-50">
@@ -27,111 +75,18 @@ export default async function SetupPage() {
           <div className="mx-auto mb-3 flex items-center justify-center h-12 w-12 rounded-xl bg-primary/10">
             <Shield className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-xl">Setup Akun Personel</CardTitle>
+          <CardTitle className="text-xl">Registrasi Admin Instansi</CardTitle>
           <CardDescription>
-            Akun Anda belum terdaftar di sistem. Lengkapi data di bawah.
+            Buat akun admin untuk instansi Anda. Setelah terdaftar, Anda dapat menambahkan akun untuk unit lain.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form
-            action={async (fd: FormData) => {
-              'use server'
-              const { getUser } = await import('@/lib/auth')
-              const { createAdminClient } = await import('@/lib/supabase/admin')
-              const u = await getUser()
-              if (!u) redirect('/login')
-
-              const admin = createAdminClient()
-              await admin.from('personel').insert({
-                id: u.id,
-                tenant_id: fd.get('tenant_id') as string,
-                organization_id: fd.get('organization_id') as string || null,
-                role: fd.get('role') as string,
-                nip: fd.get('nip') as string || null,
-                nama_lengkap: fd.get('nama_lengkap') as string,
-                pangkat: fd.get('pangkat') as string || null,
-                jabatan: fd.get('jabatan') as string || null,
-                kesatuan: fd.get('kesatuan') as string || null,
-              })
-              redirect('/')
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="tenant_id" className="text-xs">Instansi (Polda)</Label>
-              <Select name="tenant_id" required>
-                <SelectTrigger><SelectValue placeholder="Pilih Polda" /></SelectTrigger>
-                <SelectContent>
-                  {(tenants || []).map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.nama} ({t.kode})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="role" className="text-xs">Role</Label>
-              <Select name="role" required>
-                <SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="oversight">Oversight (Bidpropam)</SelectItem>
-                  <SelectItem value="admin_subbid">Admin Subbid</SelectItem>
-                  <SelectItem value="operator_unit">Operator Unit</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="organization_id" className="text-xs">Unit (opsional)</Label>
-              <Select name="organization_id">
-                <SelectTrigger><SelectValue placeholder="Pilih unit" /></SelectTrigger>
-                <SelectContent>
-                  {(units || []).map((u) => (
-                    <SelectItem key={u.id} value={u.id}>{u.nama}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="nip" className="text-xs">NRP/NIP</Label>
-                <Input name="nip" placeholder="NRP" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pangkat" className="text-xs">Pangkat</Label>
-                <Input name="pangkat" placeholder="Pangkat" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="nama_lengkap" className="text-xs">Nama Lengkap</Label>
-              <Input name="nama_lengkap" placeholder="Nama" required />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="jabatan" className="text-xs">Jabatan</Label>
-                <Input name="jabatan" placeholder="Jabatan" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="kesatuan" className="text-xs">Kesatuan</Label>
-                <Input name="kesatuan" placeholder="Kesatuan" />
-              </div>
-            </div>
-
-            {(!tenants || tenants.length === 0) && (
-              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm border border-destructive/20">
-                Belum ada instansi (tenant) terdaftar. Hubungi administrator untuk membuat tenant terlebih dahulu.
-              </div>
-            )}
-
-            <Button type="submit" className="w-full" disabled={!tenants || tenants.length === 0}>
-              Daftarkan Akun
-            </Button>
-          </form>
+          <SetupForm
+            onSubmitAction={handleRegister}
+          />
         </CardContent>
       </Card>
     </div>
   )
 }
+

@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation'
+﻿import { redirect } from 'next/navigation'
 import { getPersonel, requireTenant } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Building2, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 
 interface Props {
   searchParams: Promise<{ error?: string }>
@@ -21,8 +21,7 @@ export default async function OrganisasiPage({ searchParams }: Props) {
   const tenantId = await requireTenant()
   const supabase = await createClient()
 
-  const { data: tenant } = await supabase.from('tenants').select('*').eq('id', tenantId).single()
-  const { data: orgs } = await supabase.from('organizations').select('*').eq('tenant_id', tenantId).order('tipe').order('nama')
+    const { data: orgs } = await supabase.from('organizations').select('*').eq('tenant_id', tenantId).order('tipe').order('nama')
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -33,50 +32,11 @@ export default async function OrganisasiPage({ searchParams }: Props) {
       )}
       <PageHeader title="Pengaturan Organisasi" description="Data instansi dan struktur organisasi" />
 
-      <Card className="border-0 ring-1 ring-border/50">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-primary" />
-            Informasi Instansi
-          </CardTitle>
-          <CardDescription>Nama, kode, dan alamat instansi</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form action={async (fd: FormData) => {
-            'use server'
-            const { requireTenant } = await import('@/lib/auth')
-            const supabase = await (await import('@/lib/supabase/server')).createClient()
-            const tid = await requireTenant()
-            await supabase.from('tenants').update({
-              kode: fd.get('kode') as string,
-              nama: fd.get('nama') as string,
-              alamat: fd.get('alamat') as string || null,
-            }).eq('id', tid)
-            redirect('/pengaturan/organisasi')
-          }} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="kode">Kode Instansi</Label>
-                <Input name="kode" defaultValue={tenant?.kode || ''} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="nama">Nama Instansi</Label>
-                <Input name="nama" defaultValue={tenant?.nama || ''} required />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="alamat">Alamat</Label>
-              <Input name="alamat" defaultValue={tenant?.alamat || ''} placeholder="Alamat lengkap instansi" />
-            </div>
-            <Button type="submit">Simpan</Button>
-          </form>
-        </CardContent>
-      </Card>
-
+      
       <Card className="border-0 ring-1 ring-border/50">
         <CardHeader>
           <CardTitle className="text-base">Pejabat Penandatangan</CardTitle>
-          <CardDescription>Data Kabidpropam dan Kasubbid Paminal untuk kopstuk dokumen</CardDescription>
+          <CardDescription></CardDescription>
         </CardHeader>
         <CardContent>
           <PejabatForm tenantId={tenantId} />
@@ -87,7 +47,7 @@ export default async function OrganisasiPage({ searchParams }: Props) {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-base">Struktur Unit ({orgs?.length || 0})</CardTitle>
-            <CardDescription>Kelola Subbid dan Unit</CardDescription>
+            <CardDescription></CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -178,7 +138,7 @@ async function PejabatForm({ tenantId }: { tenantId: string }) {
   const { data: vars } = await supabase.from('tenant_variables')
     .select('*')
     .eq('tenant_id', tenantId)
-    .in('key', ['nama_kabid', 'pangkat_kabid', 'nip_kabid', 'nama_kasi', 'pangkat_kasi', 'nip_kasi'])
+    .in('key', ['nama_kabid', 'pangkat_kabid', 'nip_kabid', 'nama_kasubbid', 'pangkat_kasubbid', 'nrp_kasubbid'])
     .order('key')
 
   const map: Record<string, string> = {}
@@ -190,7 +150,7 @@ async function PejabatForm({ tenantId }: { tenantId: string }) {
       const { requireTenant } = await import('@/lib/auth')
       const supabase = await (await import('@/lib/supabase/server')).createClient()
       const tid = await requireTenant()
-      const keys = ['nama_kabid', 'pangkat_kabid', 'nip_kabid', 'nama_kasi', 'pangkat_kasi', 'nip_kasi']
+      const keys = ['nama_kabid', 'pangkat_kabid', 'nip_kabid', 'nama_kasubbid', 'pangkat_kasubbid', 'nrp_kasubbid']
       for (const key of keys) {
         const value = (fd.get(key) as string) || ''
         const { data: existing } = await supabase.from('tenant_variables').select('id').eq('tenant_id', tid).eq('key', key).maybeSingle()
@@ -224,16 +184,16 @@ async function PejabatForm({ tenantId }: { tenantId: string }) {
         <Label className="text-sm font-semibold mb-3 block">Kasubbid Paminal</Label>
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="nama_kasi" className="text-xs text-muted-foreground">Nama</Label>
-            <Input name="nama_kasi" defaultValue={map.nama_kasi} placeholder="Nama Kasubbid" className="h-9" />
+            <Label htmlFor="nama_kasubbid" className="text-xs text-muted-foreground">Nama</Label>
+            <Input name="nama_kasubbid" defaultValue={map.nama_kasubbid} placeholder="Nama Kasubbid" className="h-9" />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="pangkat_kasi" className="text-xs text-muted-foreground">Pangkat</Label>
-            <Input name="pangkat_kasi" defaultValue={map.pangkat_kasi} placeholder="Pangkat" className="h-9" />
+            <Label htmlFor="pangkat_kasubbid" className="text-xs text-muted-foreground">Pangkat</Label>
+            <Input name="pangkat_kasubbid" defaultValue={map.pangkat_kasubbid} placeholder="Pangkat" className="h-9" />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="nip_kasi" className="text-xs text-muted-foreground">NIP/NRP</Label>
-            <Input name="nip_kasi" defaultValue={map.nip_kasi} placeholder="NIP" className="h-9" />
+            <Label htmlFor="nrp_kasubbid" className="text-xs text-muted-foreground">NIP/NRP</Label>
+            <Input name="nrp_kasubbid" defaultValue={map.nrp_kasubbid} placeholder="NIP" className="h-9" />
           </div>
         </div>
       </div>

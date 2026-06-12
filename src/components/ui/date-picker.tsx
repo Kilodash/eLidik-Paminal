@@ -21,6 +21,8 @@ interface DatePickerProps {
   placeholder?: string
   name?: string
   required?: boolean
+  disableFuture?: boolean
+  variant?: 'default' | 'split'
 }
 
 export function DatePicker({
@@ -30,9 +32,12 @@ export function DatePicker({
   className,
   placeholder = 'Pilih tanggal',
   name,
-  required = false
+  required = false,
+  disableFuture = false,
+  variant = 'default'
 }: DatePickerProps) {
   const [internalDate, setInternalDate] = React.useState<Date | undefined>(value)
+  const [open, setOpen] = React.useState(false)
 
   // Use the controlled value if provided, otherwise fallback to internal state
   const isControlled = value !== undefined
@@ -45,20 +50,37 @@ export function DatePicker({
     if (onChange) {
       onChange(selectedDate)
     }
+    setOpen(false)
   }
 
   return (
     <div className={cn("relative", className)}>
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger className={cn(
-            "flex h-9 w-full items-center justify-start rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+            "flex w-full rounded-md border border-input bg-transparent text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-left overflow-hidden",
+            variant === 'split' ? "p-0 items-stretch h-9" : "px-3 py-2 items-center h-9",
             !date && "text-muted-foreground",
             className
           )}
           disabled={disabled}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {date ? format(date, "dd MMMM yyyy", { locale: idLocale }) : <span>{placeholder}</span>}
+          {variant === 'split' ? (
+            <>
+              <span className="px-3 truncate flex-1 flex items-center h-full">
+                {date ? format(date, "dd MMMM yyyy", { locale: idLocale }) : <span>{placeholder}</span>}
+              </span>
+              <span className="flex items-center justify-center border-l border-input h-full px-3 text-muted-foreground bg-muted/20 hover:bg-muted/40 transition-colors shrink-0">
+                <CalendarIcon className="h-4 w-4" />
+              </span>
+            </>
+          ) : (
+            <>
+              <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+              <span className="truncate">
+                {date ? format(date, "dd MMMM yyyy", { locale: idLocale }) : <span>{placeholder}</span>}
+              </span>
+            </>
+          )}
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar
@@ -66,7 +88,7 @@ export function DatePicker({
             selected={date}
             onSelect={handleSelect}
             locale={idLocale}
-            disabled={disabled}
+            disabled={disableFuture ? { after: new Date() } : disabled}
           />
         </PopoverContent>
       </Popover>

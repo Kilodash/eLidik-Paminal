@@ -16,10 +16,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen bg-muted/20">
+      <div className="flex h-screen bg-muted/20 overflow-hidden">
         <Sidebar onLogout={handleLogout} />
-        <main className="flex-1 overflow-auto">
-          <div className="p-6 page-transition">{children}</div>
+        <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+          <div className="p-6 page-transition flex-1 flex flex-col h-full min-h-0">{children}</div>
         </main>
       </div>
     </SidebarProvider>

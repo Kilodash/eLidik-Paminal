@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 
 type SidebarContextType = {
   collapsed: boolean
@@ -12,17 +12,22 @@ const SidebarContext = createContext<SidebarContextType>({
   toggle: () => {},
 })
 
-export function useSidebar() {
+export function useSidebar(): SidebarContextType {
   return useContext(SidebarContext)
 }
 
-export function SidebarProvider({ children }: { children: ReactNode }) {
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('sidebar-collapsed') === 'true'
-  })
+export function SidebarProvider({ children }: { children: ReactNode }): React.JSX.Element {
+  const [collapsed, setCollapsed] = useState<boolean>(false)
 
-  const toggle = () => {
+  useEffect(() => {
+    const stored = localStorage.getItem('sidebar-collapsed')
+    if (stored === 'true') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCollapsed(true)
+    }
+  }, [])
+
+  const toggle = (): void => {
     setCollapsed((prev) => {
       const next = !prev
       localStorage.setItem('sidebar-collapsed', String(next))

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Shield, Eye, EyeOff } from 'lucide-react'
 
@@ -96,6 +97,9 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
               {loading ? 'Memproses...' : 'Masuk'}
             </Button>
+            <div className="text-center mt-4 text-sm text-muted-foreground">
+              Belum punya akun admin? <Link href="/setup" className="text-primary hover:underline">Daftar instansi baru</Link>
+            </div>
           </form>
         </CardContent>
       </Card>

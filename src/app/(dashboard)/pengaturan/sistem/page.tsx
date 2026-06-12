@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation'
 import { getPersonel } from '@/lib/auth'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Wrench, Database, Shield, RefreshCw } from 'lucide-react'
+import { Wrench, Database, Shield, RefreshCw, Type } from 'lucide-react'
+import { FontSizeSelector } from '@/components/font-size-selector'
 
 export default async function SistemPage() {
   const personel = await getPersonel()
@@ -13,6 +14,18 @@ export default async function SistemPage() {
       <PageHeader title="Pengaturan Sistem" description="Konfigurasi sistem dan pemeliharaan" />
 
       <div className="grid gap-4 md:grid-cols-2">
+        <Card className="border-0 ring-1 ring-border/50">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Type className="h-4 w-4 text-primary" />
+              Tampilan & Aksesibilitas
+            </CardTitle>
+            <CardDescription>Atur preferensi tampilan aplikasi</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FontSizeSelector />
+          </CardContent>
+        </Card>
         <Card className="border-0 ring-1 ring-border/50">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">

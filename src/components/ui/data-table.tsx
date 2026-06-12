@@ -23,6 +23,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -36,6 +37,7 @@ interface DataTableProps<TData, TValue> {
   onPageChange?: (page: number) => void
   isLoading?: boolean
   emptyMessage?: string
+  bordered?: boolean
 }
 
 export function DataTable<TData, TValue>({
@@ -50,6 +52,7 @@ export function DataTable<TData, TValue>({
   onPageChange,
   isLoading,
   emptyMessage = 'Tidak ada data',
+  bordered = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -71,7 +74,7 @@ export function DataTable<TData, TValue>({
   const totalPages = totalCount ? Math.ceil(totalCount / pageSize) : table.getPageCount()
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 flex flex-col flex-1 min-h-0">
       {searchKey && (
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -84,14 +87,31 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      <div className="rounded-lg border overflow-hidden">
-        <Table className="stripe-table">
+      <div className={cn(
+        "rounded-lg border overflow-y-auto flex-1 min-h-0 bg-background",
+        bordered && "border-black"
+      )}>
+        <Table 
+          className={cn(
+            "stripe-table",
+            bordered && "border-collapse [&_th]:border [&_th]:border-black [&_td]:border [&_td]:border-black"
+          )} 
+          containerClassName="overflow-x-hidden"
+        >
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="bg-primary/5 hover:bg-primary/5 border-b-2 border-primary/10">
+              <TableRow 
+                key={headerGroup.id} 
+                className={cn(
+                  "bg-primary/5 hover:bg-primary/5 border-b-2 border-primary/10",
+                  bordered && "border-b border-black"
+                )}
+              >
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="font-semibold text-primary py-3">
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                  <TableHead key={header.id} className="font-semibold text-primary py-3 text-center">
+                    <div className="flex items-center justify-center w-full">
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                    </div>
                   </TableHead>
                 ))}
               </TableRow>

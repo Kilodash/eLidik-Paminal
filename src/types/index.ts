@@ -2,8 +2,15 @@ export type TenantRole = 'oversight' | 'admin_subbid' | 'operator_unit'
 
 export type OrganizationType = 'bidpropam' | 'subbid' | 'unit'
 
-export type PengaduanJenis = 'pengaduan' | 'laporan_informasi'
+export type PengaduanJenis = string
 
+export interface JenisPengaduan {
+  id: string
+  tenant_id: string
+  kode: string | null
+  nama: string
+  created_at: string
+}
 export type IdentitasStatus = 'diketahui' | 'tidak_diketahui' | 'terkonfirmasi'
 
 export type DocumentStatus = 'draft' | 'final' | 'printed'
@@ -87,6 +94,9 @@ export interface Pengaduan {
   nomor_surat?: string | null
   tgl_surat?: string | null
   keterangan?: string | null
+  disposisi_kabid?: string[] | null
+  disposisi_kasubbid?: string[] | null
+  disposisi_tambahan?: string | null
   created_by: string | null
   created_at: string
   // joined

@@ -1,0 +1,3 @@
+[submodule "elidik-paminal"]
+	path = elidik-paminal
+	url = https://github.com/anomalyco/elidik-paminal.git

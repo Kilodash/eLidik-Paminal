@@ -301,3 +301,60 @@ export async function saveMasterTemplateAction(
 ) {
   return saveMasterTemplate(kode, data)
 }
+
+// =============== Stempel / Signet Actions ===============
+
+export async function uploadStempelAction(formData: FormData) {
+  const supabase = await createClient()
+  const tenantId = await requireTenant()
+
+  const file = formData.get('file') as File | null
+  if (!file) return { error: 'File tidak ditemukan' }
+
+  if (!file.type.startsWith('image/')) {
+    return { error: 'File harus berupa gambar (PNG, JPG)' }
+  }
+
+  const storagePath = `${tenantId}/stempel.png`
+  const arrayBuffer = await file.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+
+  const { error } = await supabase.storage
+    .from('templates')
+    .upload(storagePath, buffer, {
+      contentType: file.type,
+      upsert: true,
+    })
+
+  if (error) return { error: 'Gagal mengunggah stempel: ' + error.message }
+
+  return { success: true, path: storagePath }
+}
+
+export async function getStempelUrlAction() {
+  const supabase = await createClient()
+  const tenantId = await requireTenant()
+
+  const storagePath = `${tenantId}/stempel.png`
+
+  const { data } = await supabase.storage
+    .from('templates')
+    .createSignedUrl(storagePath, 3600)
+
+  return { url: data?.signedUrl || null }
+}
+
+export async function removeStempelAction() {
+  const supabase = await createClient()
+  const tenantId = await requireTenant()
+
+  const storagePath = `${tenantId}/stempel.png`
+
+  const { error } = await supabase.storage
+    .from('templates')
+    .remove([storagePath])
+
+  if (error) return { error: 'Gagal menghapus stempel: ' + error.message }
+
+  return { success: true }
+}

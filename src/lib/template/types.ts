@@ -1,6 +1,13 @@
 export type VariableSource = 'tenant' | 'pengaduan' | 'system' | 'user_input' | 'metadata'
 export type InputType = 'text' | 'textarea' | 'date' | 'select' | 'list' | 'checkbox_group' | 'auto'
 
+export interface ValidationConfig {
+  min_length?: number
+  max_length?: number
+  pattern?: string
+  message?: string
+}
+
 export interface VariableDef {
   id?: string
   document_type_kode: string
@@ -12,6 +19,8 @@ export interface VariableDef {
   display_group: string
   required: boolean
   list_config?: ListConfig | null
+  validation?: ValidationConfig | null
+  description?: string | null
 }
 
 export interface ListConfig {

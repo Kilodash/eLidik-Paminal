@@ -74,6 +74,63 @@ export async function getUukFormDataAction(pengaduanId?: string) {
   }
 }
 
+/**
+ * Ambil nilai default untuk form generik:
+ * - tenantVars: seluruh variabel tenant (key/value) untuk prefill (mis. kop, pejabat).
+ * - pengaduanData: data dasar dari pengaduan (jika ada) untuk prefill perihal/satker/unit/nomor.
+ * - nextNomor: nomor urut register berikutnya untuk jenis dokumen ini (bulan berjalan).
+ */
+export async function getGenericFormDefaultsAction(
+  documentTypeKode: string,
+  pengaduanId?: string,
+) {
+  const supabase = await createClient()
+  const tenantId = await requireTenant()
+
+  const { data: tenantVars } = await supabase
+    .from('tenant_variables')
+    .select('key, value')
+    .eq('tenant_id', tenantId)
+
+  const vars: Record<string, string> = {}
+  for (const v of tenantVars || []) {
+    vars[v.key] = v.value || ''
+  }
+
+  let pengaduanData: Record<string, string> = {}
+  if (pengaduanId) {
+    const { data: pengaduan } = await supabase
+      .from('pengaduan')
+      .select('nomor_register, kronologi, satker_dilaporkan, unit:organizations(nama)')
+      .eq('id', pengaduanId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+
+    if (pengaduan) {
+      pengaduanData = {
+        perihal: pengaduan.kronologi?.substring(0, 100) || '',
+        satker: pengaduan.satker_dilaporkan || '',
+        unit_nama: (pengaduan.unit as { nama?: string })?.nama || '',
+        nomor_register: pengaduan.nomor_register || '',
+      }
+    }
+  }
+
+  const now = new Date()
+  const { data: register } = await supabase
+    .from('document_registers')
+    .select('nomor_terakhir')
+    .eq('tenant_id', tenantId)
+    .eq('document_type_kode', documentTypeKode)
+    .eq('tahun', now.getFullYear())
+    .eq('bulan', now.getMonth() + 1)
+    .maybeSingle()
+
+  const nextNomor = (register?.nomor_terakhir || 0) + 1
+
+  return { tenantVars: vars, pengaduanData, nextNomor }
+}
+
 export async function getTemplateAction(documentTypeKode: string) {
   const supabase = await createClient()
   const tenantId = await requireTenant()

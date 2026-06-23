@@ -77,9 +77,10 @@ export function UukForm({ pengaduanId, variableDefs, onChange }: GenericFormProp
   const [taktikOptions] = useState(() => getTaktikOptions(variableDefs || []))
 
   const buildVars = useCallback((data: UukFormValues): Record<string, string> => {
-    const baketHtml = data.baket.filter(b => b).map((b, i) => `${i + 1}. ${b}`).join('<br/>')
-    const sumberHtml = data.sumberBaket.filter(s => s).map((s, i) => `${i + 1}. ${s}`).join('<br/>')
-    const taktikHtml = data.taktik.join('<br/>')
+    // Pakai newline (\n) bukan <br/>: docxtemplater dgn linebreaks:true membuat baris baru asli.
+    const baketHtml = data.baket.filter(b => b).map((b, i) => `${i + 1}. ${b}`).join('\n')
+    const sumberHtml = data.sumberBaket.filter(s => s).map((s, i) => `${i + 1}. ${s}`).join('\n')
+    const taktikHtml = data.taktik.map((t, i) => `${i + 1}. ${t}`).join('\n')
     const waktuHtml = data.waktuMulai && data.waktuSelesai
       ? `${data.waktuMulai} s.d. ${data.waktuSelesai}`
       : '-'
@@ -145,21 +146,15 @@ export function UukForm({ pengaduanId, variableDefs, onChange }: GenericFormProp
     loadFormData()
   }, [loadFormData])
 
-  const isInitialLoad = useRef(true)
   useEffect(() => {
-    if (!loading && isInitialLoad.current) {
-      isInitialLoad.current = false
+    if (!loading) {
       onChange(buildVars(formData))
     }
   }, [loading, formData, onChange, buildVars])
 
   const updateForm = useCallback((updater: (prev: UukFormValues) => UukFormValues) => {
-    setFormData(prev => {
-      const next = updater(prev)
-      onChange(buildVars(next))
-      return next
-    })
-  }, [onChange, buildVars])
+    setFormData(updater)
+  }, [])
 
   const addBaket = () => updateForm(prev => ({ ...prev, baket: [...prev.baket, ''] }))
   const removeBaket = (idx: number) => updateForm(prev => ({ ...prev, baket: prev.baket.filter((_, i) => i !== idx) }))

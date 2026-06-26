@@ -654,6 +654,17 @@ export async function saveSinglePropamDataAction(item: any) {
       throw new Error("Unauthorized")
     }
 
+    const statusMap: Record<string, string> = {
+      'Laporan Diterima Kasubbid Paminal': 'diterima',
+      'Laporan Masuk': 'proses',
+      'Terbukti': 'terbukti',
+      'Tidak Terbukti': 'tidak_terbukti',
+      'Laporan Selesai Restorative Justice': 'perdamaian',
+    }
+
+    const statusLabel = item.status_label || ''
+    const mappedStatus = statusMap[statusLabel] || 'diterima'
+
     const dataPayload = {
       jenis: "Pengaduan Cepat Propam",
       tgl_pengaduan: new Date(item.created_date).toISOString().split('T')[0],
@@ -664,6 +675,7 @@ export async function saveSinglePropamDataAction(item: any) {
       satker_dilaporkan: item.disposisi_polda || "POLDA JAWA BARAT",
       keterangan: '',
       kronologi: item.summary || '',
+      status: mappedStatus,
       atensi: true,
       created_by: userId,
     }
@@ -675,6 +687,66 @@ export async function saveSinglePropamDataAction(item: any) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error('Error saving data GAJAMADA:', error)
+    return { error: error.message || 'Gagal menyimpan data pengaduan GAJAMADA' }
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function bulkSavePropamDataAction(items: any[]) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
+
+    if (!userId) {
+      throw new Error("Unauthorized")
+    }
+
+    const statusMap: Record<string, string> = {
+      'Laporan Diterima Kasubbid Paminal': 'diterima',
+      'Laporan Masuk': 'proses',
+      'Terbukti': 'terbukti',
+      'Tidak Terbukti': 'tidak_terbukti',
+      'Laporan Selesai Restorative Justice': 'perdamaian',
+    }
+
+    let imported = 0
+    let skipped = 0
+
+    for (const item of items) {
+      const statusLabel = item.status_label || ''
+      const mappedStatus = statusMap[statusLabel] || 'diterima'
+
+      const dataPayload = {
+        jenis: "Pengaduan Cepat Propam",
+        tgl_pengaduan: new Date(item.created_date).toISOString().split('T')[0],
+        tgl_surat: new Date(item.created_date).toISOString().split('T')[0],
+        nomor_surat: item.id || '',
+        pelapor_nama: item.pengirim || "Hamba Allah",
+        terlapor_nama: item.prepetrator_name || "Tidak Diketahui",
+        satker_dilaporkan: item.disposisi_polda || "POLDA JAWA BARAT",
+        keterangan: '',
+        kronologi: item.summary || '',
+        status: mappedStatus,
+        atensi: true,
+        created_by: userId,
+      }
+
+      try {
+        await createPengaduan(dataPayload)
+        imported++
+      } catch (e) {
+        console.error('Error importing item:', item.id, e)
+        skipped++
+      }
+    }
+
+    revalidatePath('/pengaduan')
+
+    return { success: true, imported, skipped }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
+    console.error('Error bulk saving GAJAMADA data:', error)
     return { error: error.message || 'Gagal menyimpan data pengaduan GAJAMADA' }
   }
 }

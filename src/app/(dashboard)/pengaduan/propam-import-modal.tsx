@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, Plus, AlertCircle, ChevronLeft, ChevronRight, Eye, ArrowLeft } from 'lucide-react'
-import { checkUnsavedPropamDataAction, saveSinglePropamDataAction } from './actions'
+import { checkUnsavedPropamDataAction, saveSinglePropamDataAction, bulkSavePropamDataAction } from './actions'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 
@@ -18,6 +18,7 @@ export function PropamImportModal() {
   const [page, setPage] = useState(1)
   // null = tabel list, number = indeks item detail
   const [detailIndex, setDetailIndex] = useState<number | null>(null)
+  const [isBulkImporting, setIsBulkImporting] = useState(false)
 
   async function handleCheck() {
     setLoading(true)
@@ -69,6 +70,29 @@ export function PropamImportModal() {
     }
   }
 
+  async function handleBulkAdd() {
+    const unsavedItems = items.filter(i => !i.alreadySaved)
+    if (unsavedItems.length === 0) {
+      toast.error('Semua data sudah ada di sistem.')
+      return
+    }
+    setIsBulkImporting(true)
+    const loadingToast = toast.loading(`Mengimpor ${unsavedItems.length} data...`)
+    try {
+      const res = await bulkSavePropamDataAction(unsavedItems)
+      if (res.error) {
+        toast.error(res.error, { id: loadingToast })
+      } else {
+        toast.success(`Berhasil: ${res.imported} data diimpor, ${res.skipped || 0} dilewati`, { id: loadingToast })
+        // Refresh data setelah bulk import
+        handleCheck()
+      }
+    } catch (e) {
+      toast.error('Terjadi kesalahan saat impor bulk', { id: loadingToast })
+    }
+    setIsBulkImporting(false)
+  }
+
   const totalPages = Math.ceil(items.length / PAGE_SIZE)
   const pagedItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
@@ -104,15 +128,23 @@ export function PropamImportModal() {
                   Data Pengaduan GAJAMADA — Polda Jabar
                   {hasChecked && items.length > 0 && (
                     <span className="ml-2 text-sm font-normal text-muted-foreground">
-                      ({items.length} belum masuk)
+                      ({items.length} data: {items.filter(i => !i.alreadySaved).length} baru)
                     </span>
                   )}
                 </DialogTitle>
               </div>
-              <Button variant="outline" size="sm" onClick={handleCheck} disabled={loading}>
-                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
+              <div className="flex items-center gap-2">
+                {hasChecked && items.some(i => !i.alreadySaved) && (
+                  <Button size="sm" onClick={handleBulkAdd} disabled={isBulkImporting || loading} className="h-7 text-xs whitespace-nowrap">
+                    <Plus className="w-3 h-3 mr-1" />
+                    {isBulkImporting ? 'Mengimpor...' : `Impor Semua (${items.filter(i => !i.alreadySaved).length})`}
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={handleCheck} disabled={loading}>
+                  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
             </div>
           </DialogHeader>
 

@@ -32,7 +32,10 @@ export function ClearableSelect({ options, defaultValue, ...props }: any) {
   }, [])
 
   return (
-    <Select {...props} key={resetKey} value={val} onValueChange={setVal}>
+    <Select {...props} key={resetKey} value={val} onValueChange={(v) => {
+      setVal(v)
+      if (props.onValueChange) props.onValueChange(v)
+    }}>
       <SelectTrigger key="trigger" className="h-8 text-xs w-full">
         <SelectValue placeholder="Pilih..." />
       </SelectTrigger>

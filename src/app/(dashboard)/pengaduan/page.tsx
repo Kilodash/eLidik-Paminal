@@ -1,4 +1,4 @@
-﻿import Link from 'next/link'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getPengaduanList, getPengaduanById } from '@/lib/data/pengaduan'
 import { getWilayahSatkerList, getJenisPengaduanList, getUnitList } from '@/lib/data/master'
@@ -25,8 +25,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { JenisDumasSelect } from './jenis-dumas-select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DistribusiForm } from '@/components/pengaduan/distribusi-form'
+
+import { PropamImportModal } from './propam-import-modal'
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -66,7 +69,13 @@ export default async function PengaduanListPage({ searchParams }: Props) {
 
   return (
     <div className="w-full h-full flex flex-col flex-1 overflow-hidden">
-      <PageHeader title="Pengaduan" description="Daftar pengaduan masyarakat dan laporan informasi" />
+      <div className="flex justify-between items-center px-4 py-2 bg-muted/20 border-b">
+        <div>
+          <h1 className="text-xl font-bold">Pengaduan</h1>
+          <p className="text-sm text-muted-foreground">Daftar pengaduan masyarakat dan laporan informasi</p>
+        </div>
+        <PropamImportModal />
+      </div>
 
       <ResizableFormTableLayout
         showForm={personel.role !== 'operator_unit'}
@@ -92,7 +101,7 @@ export default async function PengaduanListPage({ searchParams }: Props) {
 
                 <div className="grid grid-cols-[110px_1fr] items-center gap-2 shrink-0">
                   <Label className="font-semibold">Jenis Dumas *</Label>
-                  <ClearableSelect 
+                  <JenisDumasSelect 
                     name="jenis" 
                     required 
                     defaultValue={editData?.jenis || '--'}

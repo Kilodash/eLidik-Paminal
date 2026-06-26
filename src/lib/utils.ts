@@ -19,3 +19,12 @@ export function formatSentenceCase(text: string | null | undefined): string {
   const trimmed = text.trim()
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
 }
+
+const ROMAWI = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
+
+export function formatNomorDokumen(template: string, date: Date): string {
+  let result = template
+  result = result.replace(/\{\{bulan_romawi\}\}/g, ROMAWI[date.getMonth() + 1] || '')
+  result = result.replace(/\{\{tahun\}\}/g, String(date.getFullYear()))
+  return result
+}

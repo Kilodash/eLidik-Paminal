@@ -319,7 +319,7 @@ async function autoGeneratePerdamaianDocuments(
 }
 
 // Action to generate a single document and associate it with a complaint/berkas
-export async function generateSingleDocumentAction(pengaduanId: string, docKode: string, docNama: string) {
+export async function generateSingleDocumentAction(pengaduanId: string, docKode: string, docNama: string, subKategori?: string, metadata?: string) {
   try {
     const supabase = await createClient()
     const tenantId = await requireTenant()
@@ -349,6 +349,8 @@ export async function generateSingleDocumentAction(pengaduanId: string, docKode:
       return { success: true, message: `Dokumen ${docNama} sudah pernah dibuat.` }
     }
 
+    const tahap = subKategori || 'Perdamaian'
+
     // Get or create document type record
     let docTypeId = null
     const { data: docType } = await supabase
@@ -368,7 +370,7 @@ export async function generateSingleDocumentAction(pengaduanId: string, docKode:
           tenant_id: tenantId,
           kode: docKode,
           nama: docNama,
-          tahap: 'Perdamaian',
+          tahap,
           is_active: true
         })
         .select('id')
@@ -400,8 +402,9 @@ export async function generateSingleDocumentAction(pengaduanId: string, docKode:
       <div style="font-family: sans-serif; padding: 20px;">
         <h2 style="text-align: center;">${docNama.toUpperCase()}</h2>
         <p style="text-align: center;">Nomor: ${nomorSurat}</p>
+        ${metadata ? `<p>Metadata: ${metadata}</p>` : ''}
         <hr/>
-        <p>Dokumen ini telah digenerate secara otomatis melalui mekanisme perdamaian dumas.</p>
+        <p>Dokumen ini telah digenerate secara otomatis melalui mekanisme ${tahap.toLowerCase()} dumas.</p>
         <p>Tanggal Dokumen: ${new Date().toLocaleDateString('id-ID')}</p>
       </div>
     `
@@ -411,7 +414,7 @@ export async function generateSingleDocumentAction(pengaduanId: string, docKode:
       template_id: templateId,
       pengaduan_id: pengaduanId,
       berkas_id: berkasId,
-      tahap: 'Perdamaian',
+      tahap,
       nomor_surat: nomorSurat,
       tgl_dokumen: new Date().toISOString().split('T')[0],
       content_rendered: htmlContent,
@@ -426,6 +429,50 @@ export async function generateSingleDocumentAction(pengaduanId: string, docKode:
   } catch (error: any) {
     console.error('Error generating document:', error)
     return { error: error.message || 'Gagal membuat dokumen' }
+  }
+}
+
+export async function updatePengaduanStatusAction(pengaduanId: string, newStatus: string, catatan: string) {
+  try {
+    const supabase = await createClient()
+    const tenantId = await requireTenant()
+    
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
+
+    const { data: current } = await supabase
+      .from('pengaduan')
+      .select('status')
+      .eq('id', pengaduanId)
+      .eq('tenant_id', tenantId)
+      .single()
+
+    const { error: updateError } = await supabase
+      .from('pengaduan')
+      .update({ status: newStatus })
+      .eq('id', pengaduanId)
+      .eq('tenant_id', tenantId)
+
+    if (updateError) throw updateError
+
+    if (userId) {
+      await supabase.from('status_history').insert({
+        tenant_id: tenantId,
+        ref_type: 'pengaduan',
+        ref_id: pengaduanId,
+        status_lama: current?.status || 'diterima',
+        status_baru: newStatus,
+        catatan,
+        user_id: userId,
+        aksi: 'tinjut_hasil'
+      })
+    }
+
+    revalidatePath('/pengaduan')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error updating pengaduan status:', error)
+    return { success: false, error: error.message || 'Gagal mengupdate status' }
   }
 }
 
@@ -469,9 +516,165 @@ export async function updateDistribusiAction(pengaduanId: string, unitId: string
     return { success: true }
   } catch (error: any) {
     console.error('Error in distribusi:', error)
-    return { error: error.message || 'Gagal menyimpan distribusi' }
+    return { success: false, error: error.message || 'Gagal menyimpan distribusi' }
   }
 }
 
 
+export async function checkUnsavedPropamDataAction() {
+  try {
+    const supabase = await createClient()
+    const tenantId = await requireTenant()
+    
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
 
+    if (!userId) {
+      throw new Error("Unauthorized")
+    }
+
+    const url = "https://gajamada-propam.polri.go.id/api/v1/apps/data/management/get-all"
+    const headers = {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+      "Origin": "https://gajamada-propam.polri.go.id",
+      "Referer": "https://gajamada-propam.polri.go.id/",
+      // Cookie hardcoded sementara untuk testing. Nanti pindahkan ke .env
+      "Cookie": "token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiYTA3NjExYjE3ZjA2M2Y4YjU0NjBmMmVhYTVjN2RlZGEiLCJvcmdhbml6YXRpb25faWQiOiIiLCJwZXJtaXNzaW9uX2lkIjoiMmRkMmM4ZjZkZjdlZjdiMDllYzQ1NzRiNjliNjg1OTEiLCJtdWx0aUxvZ2luIjp0cnVlLCJleHBpcmUiOjE3ODI1MDgwMjYuNDUzODY4NCwidHlwZSI6ImFjY2VzcyJ9.q1olEk30rmoe8681UP7HyyZl0aP47CjFmAHLD0TmjLA; refresh_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiYTA3NjExYjE3ZjA2M2Y4YjU0NjBmMmVhYTVjN2RlZGEiLCJvcmdhbml6YXRpb25faWQiOiIiLCJwZXJtaXNzaW9uX2lkIjoiMmRkMmM4ZjZkZjdlZjdiMDllYzQ1NzRiNjliNjg1OTEiLCJtdWx0aUxvZ2luIjp0cnVlLCJleHBpcmUiOjE3ODMwNjk2MjYuNDUzOTc3MywidHlwZSI6InJlZnJlc2gifQ.BOJSdGtDsJVF3UJrD0ffnsPohIhx3If1ck46Co1MCbE"
+    }
+    // Fetch halaman pertama untuk dapat info total halaman
+    const firstPayload = {
+      "connectionId": "245b8fd7c4a763019d5172fad5ec0086",
+      "database": "divpropam",
+      "filters": [],
+      "metaData": {
+        "widgetId": "8533ca87b75e04b1f39d19d98dabc0ef",
+        "menuId": "ce64015a07578d9195a0e589de1108c8"
+      },
+      "order": "desc",
+      "orderBy": "created_date",
+      "page": 1,
+      "size": 1000,
+      "table": "gold.report"
+    }
+
+    const firstResponse = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(firstPayload)
+    })
+
+    if (!firstResponse.ok) {
+      throw new Error(`Gagal fetch GAJAMADA: ${firstResponse.statusText}`)
+    }
+
+    const firstResult = await firstResponse.json()
+    const firstPageItems = firstResult.data || firstResult.detail?.data || []
+    const pagination = (firstResult.metaData || firstResult.detail?.metaData || {}).pagination || {}
+    const totalPages = pagination.totalPages || 1
+
+    // Filter hasil halaman pertama
+    const allFilteredItems: any[] = firstPageItems.filter((item: any) => {
+      const disposisi = (item.disposisi_case_position || '').toUpperCase()
+      return disposisi.includes('KASUBBID PAMINAL') && (disposisi.includes('JABAR') || disposisi.includes('JAWA BARAT'))
+    })
+
+    // Fetch sisa halaman secara paralel
+    if (totalPages > 1) {
+      const remainingPages = []
+      for (let p = 2; p <= Math.min(totalPages, 30); p++) {
+        remainingPages.push(
+          fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ ...firstPayload, page: p })
+          }).then(r => r.json())
+        )
+      }
+
+      const results = await Promise.all(remainingPages)
+
+      for (const result of results) {
+        const items = result.data || result.detail?.data || []
+        if (!items || items.length === 0) continue
+
+        for (const item of items) {
+          const disposisi = (item.disposisi_case_position || '').toUpperCase()
+          if (disposisi.includes('KASUBBID PAMINAL') && (disposisi.includes('JABAR') || disposisi.includes('JAWA BARAT'))) {
+            allFilteredItems.push(item)
+          }
+        }
+      }
+    }
+
+    // Deduplikasi by ID
+    const seenIds = new Set<string>()
+    const uniqueItems: any[] = []
+    for (const item of allFilteredItems) {
+      if (!seenIds.has(item.id)) {
+        seenIds.add(item.id)
+        uniqueItems.push(item)
+      }
+    }
+
+    const itemsWithStatus: any[] = []
+
+    for (const item of uniqueItems) {
+      const { data: existing } = await supabase
+        .from('pengaduan')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .neq('status', 'dibatalkan')
+        .ilike('kronologi', `%${(item.summary || item.content || '').substring(0, 50)}%`)
+        .limit(1)
+
+      itemsWithStatus.push({
+        ...item,
+        alreadySaved: !!(existing && existing.length > 0)
+      })
+    }
+
+    return { success: true, data: itemsWithStatus }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
+    console.error('Error checking GAJAMADA data:', error)
+    return { error: error.message || 'Gagal mengecek data GAJAMADA' }
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function saveSinglePropamDataAction(item: any) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
+
+    if (!userId) {
+      throw new Error("Unauthorized")
+    }
+
+    const dataPayload = {
+      jenis: "Pengaduan Cepat Propam",
+      tgl_pengaduan: new Date(item.created_date).toISOString().split('T')[0],
+      tgl_surat: new Date(item.created_date).toISOString().split('T')[0],
+      nomor_surat: item.id || '',
+      pelapor_nama: item.pengirim || "Hamba Allah",
+      terlapor_nama: item.prepetrator_name || "Tidak Diketahui",
+      satker_dilaporkan: item.disposisi_polda || "POLDA JAWA BARAT",
+      keterangan: '',
+      kronologi: item.summary || '',
+      atensi: true,
+      created_by: userId,
+    }
+
+    await createPengaduan(dataPayload)
+    revalidatePath('/pengaduan')
+
+    return { success: true }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
+    console.error('Error saving data GAJAMADA:', error)
+    return { error: error.message || 'Gagal menyimpan data pengaduan GAJAMADA' }
+  }
+}

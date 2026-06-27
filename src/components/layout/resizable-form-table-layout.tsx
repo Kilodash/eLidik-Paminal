@@ -101,10 +101,11 @@ export function ResizableFormTableLayout({
       </div>
       <div
         onMouseDown={handleMouseDown}
-        className="relative flex w-2 shrink-0 items-center justify-center cursor-col-resize bg-transparent hover:bg-border/50 rounded transition-colors group"
+        className="relative flex w-3 shrink-0 items-center justify-center cursor-col-resize bg-transparent hover:bg-border/50 rounded transition-colors group"
+        title="Seret untuk mengubah ukuran"
         suppressHydrationWarning
       >
-        <div className="z-10 flex h-8 w-1.5 items-center justify-center rounded-sm border bg-border opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="z-10 flex h-8 w-1.5 items-center justify-center rounded-sm border bg-border opacity-30 group-hover:opacity-100 transition-opacity">
           <GripVertical className="h-3 w-3" />
         </div>
       </div>

@@ -58,9 +58,11 @@ export default async function DashboardPage() {
 
   const isAdmin = personel.role !== 'operator_unit'
   const unitId = personel.role === 'operator_unit' ? personel.organization_id || undefined : undefined
-  const stats = await getDashboardStats(unitId)
-  const anevJenis = await getAnevJenis(unitId)
-  const anevUnit = isAdmin ? await getAnevUnit() : null
+  const [stats, anevJenis, anevUnit] = await Promise.all([
+    getDashboardStats(unitId),
+    getAnevJenis(unitId),
+    isAdmin ? getAnevUnit() : Promise.resolve(null),
+  ])
 
   const formatPercent = (val: number, total: number): string => {
     if (total === 0 || isNaN(val / total)) return '0,0%'

@@ -7,12 +7,14 @@ interface PageHeaderProps {
   className?: string
 }
 
-export function PageHeader({ children, className }: PageHeaderProps) {
-  if (!children) return null
-  
+export function PageHeader({ title, description, children, className }: PageHeaderProps) {
   return (
-    <div className={cn('flex items-center justify-end mb-6', className)}>
-      <div className="flex items-center gap-2">{children}</div>
+    <div className={cn('flex items-center justify-between mb-6', className)}>
+      <div>
+        <h1 className="text-lg font-bold">{title}</h1>
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      </div>
+      {children && <div className="flex items-center gap-2">{children}</div>}
     </div>
   )
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { deletePersonelAction } from '@/app/(dashboard)/pengaturan/personel/actions'
@@ -17,7 +18,7 @@ export function ConfirmDeletePersonel({ id, nama }: { id: string, nama: string }
       setIsOpen(false)
       router.refresh()
     } catch (e: any) {
-      alert(`Gagal hapus: ${e.message}`)
+      toast.error(`Gagal hapus: ${e.message}`)
     }
   }
 
@@ -28,6 +29,7 @@ export function ConfirmDeletePersonel({ id, nama }: { id: string, nama: string }
         size="icon" 
         onClick={() => setIsOpen(true)}
         className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+        aria-label={`Hapus personel ${nama}`}
       >
         <Trash2 className="h-3.5 w-3.5" />
       </Button>

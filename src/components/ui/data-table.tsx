@@ -87,8 +87,8 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      <div className={cn(
-        "rounded-lg border overflow-y-auto flex-1 min-h-0 bg-background",
+      <div data-table-container className={cn(
+        "rounded-lg border overflow-auto flex-1 min-h-0 bg-background",
         bordered && "border-black"
       )}>
         <Table 
@@ -96,7 +96,7 @@ export function DataTable<TData, TValue>({
             "stripe-table",
             bordered && "border-collapse [&_th]:border [&_th]:border-black [&_td]:border [&_td]:border-black"
           )} 
-          containerClassName="overflow-x-hidden"
+          containerClassName="overflow-x-auto"
         >
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

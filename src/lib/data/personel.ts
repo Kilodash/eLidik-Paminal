@@ -76,8 +76,8 @@ export async function getPersonelList(filters: PersonelListFilters = {}) {
   const sortBy = filters.sortBy || 'default'
   const sortOrder = filters.sortOrder || 'asc'
 
-  // Fetch all personnel to sort and filter in memory since we need complex birth year parsing and priority CASE rules
-  const { data, error } = await supabase
+  // Fetch with optional server-side text search (reduces transferred rows significantly)
+  let query = supabase
     .from('personel')
     .select(`
       *,
@@ -85,29 +85,21 @@ export async function getPersonelList(filters: PersonelListFilters = {}) {
     `)
     .eq('tenant_id', tenantId)
 
+  if (search) {
+    const like = `%${search}%`
+    query = query.or(`nama_lengkap.ilike.${like},nip.ilike.${like},pangkat.ilike.${like},jabatan.ilike.${like},kesatuan.ilike.${like},tim.ilike.${like}`)
+  }
+
+  const { data, error } = await query
+
   if (error) throw error
 
-  let list = (data || []).map((p: any) => ({
+  const list = (data || []).map((p: any) => ({
     ...p,
     org: p.organizations
   })) as Personel[]
 
-  // 1. Filter / Search
-  if (search) {
-    list = list.filter((p) => {
-      return (
-        (p.nama_lengkap || '').toLowerCase().includes(search) ||
-        (p.nip || '').toLowerCase().includes(search) ||
-        (p.pangkat || '').toLowerCase().includes(search) ||
-        (p.jabatan || '').toLowerCase().includes(search) ||
-        (p.kesatuan || '').toLowerCase().includes(search) ||
-        (p.tim || '').toLowerCase().includes(search) ||
-        ((p.org as unknown as { nama: string })?.nama || '').toLowerCase().includes(search)
-      )
-    })
-  }
-
-  // 2. Sorting
+  // 1. Sorting (complex rules: jabatan priority, pangkat, birth year, alpha)
   list.sort((a, b) => {
     let comparison = 0
 
@@ -151,7 +143,7 @@ export async function getPersonelList(filters: PersonelListFilters = {}) {
     return sortOrder === 'asc' ? comparison : -comparison
   })
 
-  // 3. Paginate
+  // 2. Paginate
   const total = list.length
   const paginatedData = list.slice((page - 1) * limit, page * limit)
 

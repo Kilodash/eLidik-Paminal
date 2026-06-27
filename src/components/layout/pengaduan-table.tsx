@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { DataTable } from '@/components/ui/data-table'
-import { Search, GitMerge, Trash2, Unlink } from 'lucide-react'
+import { Search, GitMerge, Trash2, Unlink, RotateCcw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, Handshake, Info } from 'lucide-react'
@@ -67,7 +68,7 @@ interface Props {
   sortOrder: 'asc' | 'desc'
 }
 
-export function PengaduanTable({ data, total, page, query = '', userRole, userId, sortBy = 'created_at', sortOrder = 'desc' }: Props) {
+export function PengaduanTable({ data, total, page, query = '', userRole, userId, sortBy = 'tgl_pengaduan', sortOrder = 'desc' }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [localQuery, setLocalQuery] = useState(query)
@@ -109,6 +110,26 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
     nd_saran_penghentian: false,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [ctrlHeld, setCtrlHeld] = useState(false)
+  const [kronologiLocked, setKronologiLocked] = useState(false)
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'Control') setCtrlHeld(true)
+      if (e.ctrlKey && e.shiftKey && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && !e.repeat) {
+        e.preventDefault()
+        setKronologiLocked(prev => !prev)
+      }
+    }
+    const up = (e: KeyboardEvent) => { if (e.key === 'Control') setCtrlHeld(false) }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
+  }, [])
 
   const [perdamaianDate, setPerdamaianDate] = useState<Date | undefined>(undefined)
   const [pihakHadir, setPihakHadir] = useState('pelapor, terlapor, saksi')
@@ -200,14 +221,14 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
     }
   }
 
-  const openMergeModal = async (row: PengaduanRow) => {
+  const openMergeModal = useCallback(async (row: PengaduanRow) => {
     setSelectedRow(row)
     setIsMergeOpen(true)
     const res = await getActiveBerkasListAction()
     if (res.data) {
       setActiveBerkas(res.data)
     }
-  }
+  }, [])
 
   const handleDelete = async () => {
     if (!selectedRow || !alasanHapus.trim()) return
@@ -220,7 +241,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
       setSelectedRow(null)
       router.refresh()
     } else {
-      alert(res.error || 'Gagal membatalkan dumas')
+      toast.error(res.error || 'Gagal membatalkan dumas')
     }
   }
 
@@ -235,7 +256,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
       setSelectedRow(null)
       router.refresh()
     } else {
-      alert(res.error || 'Gagal menggabungkan dumas')
+      toast.error(res.error || 'Gagal menggabungkan dumas')
     }
   }
 
@@ -249,7 +270,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
       setSelectedRow(null)
       router.refresh()
     } else {
-      alert(res.error || 'Gagal memisahkan dumas')
+      toast.error(res.error || 'Gagal memisahkan dumas')
     }
   }
 
@@ -267,7 +288,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
       setSelectedRow(null)
       router.refresh()
     } else {
-      alert(res.error || 'Gagal mengajukan perdamaian')
+      toast.error(res.error || 'Gagal mengajukan perdamaian')
     }
   }
 
@@ -278,9 +299,9 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
     setIsSubmitting(false)
     if (res.success) {
       setTindakLanjutDocs(prev => ({ ...prev, [key]: true }))
-      alert(res.message || `Dokumen ${docNama} berhasil dibuat!`)
+      toast.success(res.message || `Dokumen ${docNama} berhasil dibuat!`)
     } else {
-      alert(res.error || 'Gagal membuat dokumen')
+      toast.error(res.error || 'Gagal membuat dokumen')
     }
   }
 
@@ -298,7 +319,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
     router.push(`/pengaduan?${params.toString()}`)
   }
 
-  const columns: ColumnDef<PengaduanRow>[] = [
+  const columns = useMemo<ColumnDef<PengaduanRow>[]>(() => [
     {
       id: 'nomor_urut',
       header: 'No',
@@ -369,9 +390,8 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
                 parts.push(nama)
               }
               if (nrp && nrp !== 'xxxxxxxx') parts.push(`nrp ${nrp}`)
-              // Combine jabatan + kesatuan
-              const lokasi = [jabatan, kesatuan].filter(Boolean).join(', ')
-              if (lokasi) parts.push(`jabatan ${lokasi}`)
+              if (jabatan) parts.push(jabatan)
+              if (kesatuan && !jabatan.includes(kesatuan)) parts.push(kesatuan)
 
               const line = parts.join(', ') || 'Anggota'
 
@@ -389,26 +409,15 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
       accessorKey: 'kronologi',
       header: 'Isi Dumas / Kronologis',
       cell: ({ row }) => {
-        const [expanded, setExpanded] = useState(false)
         const hasLengkap = !!(row.original.kronologi_lengkap && row.original.kronologi_lengkap !== row.original.kronologi)
+        const displayText = kronologiLocked && hasLengkap ? row.original.kronologi_lengkap : (row.original.kronologi || '-')
         return (
           <div className="flex flex-col gap-1.5 w-full min-w-[250px]">
             <div className="whitespace-pre-wrap text-justify">
-              {row.original.kronologi || '-'}
+              {displayText}
             </div>
-            {hasLengkap && (
-              <button
-                type="button"
-                className="text-xs text-blue-600 hover:underline self-start"
-                onClick={(e) => { e.stopPropagation(); setExpanded(!expanded) }}
-              >
-                {expanded ? 'Sembunyikan lengkap' : 'Lihat kronologi asli'}
-              </button>
-            )}
-            {expanded && hasLengkap && (
-              <div className="whitespace-pre-wrap text-justify text-muted-foreground text-xs border-t pt-1 mt-1">
-                {row.original.kronologi_lengkap}
-              </div>
+            {kronologiLocked && hasLengkap && (
+              <span className="text-[10px] text-primary/60 font-medium">Ctrl+Shift: kronologi asli (terkunci)</span>
             )}
           </div>
         )
@@ -458,6 +467,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
                 }}
                 className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition-colors font-semibold border border-blue-200"
                 title="Gabung Dumas"
+                aria-label="Gabung dumas ke berkas"
               >
                 <GitMerge className="w-4 h-4" />
               </button>
@@ -470,6 +480,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
                 }}
                 className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded transition-colors font-semibold border border-amber-200"
                 title="Pisahkan dari Berkas"
+                aria-label="Pisahkan dumas dari berkas"
               >
                 <Unlink className="w-4 h-4" />
               </button>
@@ -484,6 +495,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
                 }}
                 className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded transition-colors font-semibold border border-red-200"
                 title="Hapus Dumas"
+                aria-label="Hapus dumas"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -498,6 +510,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
                 }}
                 className="p-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded transition-colors font-semibold border border-teal-200"
                 title="Ajukan Perdamaian"
+                aria-label="Ajukan perdamaian"
               >
                 <Handshake className="w-4 h-4" />
               </button>
@@ -506,7 +519,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
         )
       },
     },
-  ]
+  ], [page, searchParams, sortBy, sortOrder, userRole, openMergeModal, router, kronologiLocked])
 
   const isSyaratLengkap = syaratPerdamaian.materil_keresahan &&
     syaratPerdamaian.materil_konflik &&
@@ -538,6 +551,19 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
         <Button type="button" variant="secondary" size="sm" onClick={executeSearch} className="h-9">
           Cari
         </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-9 px-2"
+          title="Reset pencarian"
+          onClick={() => {
+            setLocalQuery('')
+            router.push('/pengaduan')
+          }}
+        >
+          <RotateCcw className="h-4 w-4" />
+        </Button>
       </div>
 
       <DataTable
@@ -546,7 +572,11 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
         totalCount={total}
         page={page}
         onPageChange={handlePageChange}
-        onRowClick={(row) => router.push(`/pengaduan?edit=${row.id}`)}
+        onRowClick={(row) => {
+          const params = new URLSearchParams(searchParams.toString())
+          params.set('edit', row.id)
+          router.push(`/pengaduan?${params.toString()}`)
+        }}
         bordered
       />
 

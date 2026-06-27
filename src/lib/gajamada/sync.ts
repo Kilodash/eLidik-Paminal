@@ -143,20 +143,21 @@ export async function syncGajamadaIntake({
       kode: normalizeCategoryName(c).toUpperCase().replace(/[^A-Z0-9]/g, '_'),
     }))
 
-    // Upsert klasifikasi
-    for (const kat of normalizedKats) {
-      const { data: existing } = await admin
-        .from('klasifikasi')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('kode', kat.kode)
-        .maybeSingle()
+    // Batch upsert klasifikasi: get existing + create missing in one batch
+    const katKodes = normalizedKats.map(k => k.kode)
+    const { data: existingKats } = await admin
+      .from('klasifikasi')
+      .select('kode')
+      .eq('tenant_id', tenantId)
+      .in('kode', katKodes)
 
-      if (!existing?.id) {
-        await admin
-          .from('klasifikasi')
-          .insert({ tenant_id: tenantId, kode: kat.kode, nama: kat.normalized })
-      }
+    const existingKodeSet = new Set((existingKats || []).map(r => r.kode))
+    const newKats = normalizedKats.filter(k => !existingKodeSet.has(k.kode))
+
+    if (newKats.length > 0) {
+      await admin
+        .from('klasifikasi')
+        .insert(newKats.map(k => ({ tenant_id: tenantId, kode: k.kode, nama: k.normalized })))
     }
 
     // Reload klasifikasi map

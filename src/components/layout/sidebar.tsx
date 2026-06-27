@@ -52,11 +52,20 @@ interface SidebarProps {
 export function Sidebar({ onLogout }: SidebarProps) {
   const pathname = usePathname()
   const { collapsed, toggle } = useSidebar()
-  const [pengaturanOpen, setPengaturanOpen] = useState(true)
+  const [pengaturanOpen, setPengaturanOpen] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('sidebar-pengaturan-open') !== 'false'
+    return true
+  })
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/'
     return pathname === href || pathname.startsWith(href + '/')
+  }
+
+  const togglePengaturan = () => {
+    const next = !pengaturanOpen
+    setPengaturanOpen(next)
+    localStorage.setItem('sidebar-pengaturan-open', String(next))
   }
 
   const isPengaturanActive = pengaturanItems.some((item) => isActive(item.href))
@@ -113,7 +122,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
         {!collapsed ? (
           <div>
             <button
-              onClick={() => setPengaturanOpen(!pengaturanOpen)}
+              onClick={() => togglePengaturan()}
               className={cn(
                 'flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm transition-all duration-200',
                 isPengaturanActive

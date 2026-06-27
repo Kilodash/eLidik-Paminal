@@ -88,7 +88,7 @@ export async function getPengaduanList(filters: SearchFilters = {}) {
   if (filters.atensi) query = query.eq('atensi', true)
 
   // Sort
-  const sortBy = filters.sortBy || 'created_at'
+  const sortBy = filters.sortBy || 'tgl_pengaduan'
   const sortOrder = filters.sortOrder === 'asc'
   query = query.order(sortBy, { ascending: sortOrder })
 

@@ -27,7 +27,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DistribusiForm } from '@/components/pengaduan/distribusi-form'
 import { AiEnrichButton } from '@/components/pengaduan/ai-enrich-button'
+import { AiEnrichAllButton } from '@/components/pengaduan/ai-enrich-all-button'
 import { SyncGajamadaButton } from '@/components/pengaduan/sync-gajamada-button'
+import { PengaduanFormNav } from '@/components/pengaduan/pengaduan-form-nav'
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -80,15 +82,44 @@ export default async function PengaduanListPage({ searchParams }: Props) {
     sortOrder,
   })
 
+  const pengaduanIds = data.map((row) => row.id)
+
+  const baseParams = (() => {
+    const params = new URLSearchParams()
+    const add = (key: string, value: string | string[] | undefined) => {
+      if (value === undefined || value === '') return
+      if (Array.isArray(value)) {
+        value.forEach((v) => params.append(key, v))
+      } else {
+        params.set(key, value)
+      }
+    }
+    add('q', sp.q)
+    add('status', sp.status)
+    add('unit', sp.unit)
+    add('klasifikasi', sp.klasifikasi)
+    add('overdue', sp.overdue)
+    add('sort', sp.sort)
+    add('order', sp.order)
+    add('page', sp.page)
+    return params.toString()
+  })()
+
   return (
     <div className="w-full h-full flex flex-col flex-1 overflow-hidden">
+      <PengaduanFormNav ids={pengaduanIds} currentId={editId} baseParams={baseParams} />
       <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
         <div>
           <h1 className="text-lg font-bold">Pengaduan</h1>
           <p className="text-sm text-muted-foreground">Daftar pengaduan masyarakat dan laporan informasi</p>
         </div>
         <div className="flex items-center gap-2">
-          {(personel.role === 'admin_subbid' || personel.role === 'oversight') && <SyncGajamadaButton />}
+          {(personel.role === 'admin_subbid' || personel.role === 'oversight') && (
+            <>
+              <SyncGajamadaButton />
+              <AiEnrichAllButton />
+            </>
+          )}
           <Link href="/pengaduan/gajamada">
             <Button type="button" variant="outline" size="sm">Monitoring Gajamada</Button>
           </Link>

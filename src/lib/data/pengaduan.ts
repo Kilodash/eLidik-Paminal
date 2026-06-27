@@ -2,6 +2,49 @@ import { createClient } from '@/lib/supabase/server'
 import type { Pengaduan, BerkasCompleteness, SearchFilters } from '@/types'
 import { requireTenant } from '@/lib/auth'
 
+async function getMatchingPengaduanIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string,
+  query: string
+): Promise<string[]> {
+  const q = query.trim()
+  const likePattern = `%${q}%`
+
+  const [vectorRes, kronoRes, terlaporLinkRes] = await Promise.all([
+    supabase
+      .from('pengaduan')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .textSearch('search_vector', q, { config: 'indonesian' }),
+    supabase
+      .from('pengaduan')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .or(`kronologi_lengkap.ilike.${likePattern},kronologi.ilike.${likePattern}`),
+    (async () => {
+      const { data: terlaporRows } = await supabase
+        .from('terlapor')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .or(`nama.ilike.${likePattern},pangkat.ilike.${likePattern},nrp.ilike.${likePattern},jabatan.ilike.${likePattern},kesatuan.ilike.${likePattern}`)
+      if (!terlaporRows || terlaporRows.length === 0) return { data: [] as { pengaduan_id: string }[] }
+      return supabase
+        .from('pengaduan_terlapor')
+        .select('pengaduan_id')
+        .in(
+          'terlapor_id',
+          terlaporRows.map((r) => r.id)
+        )
+    })(),
+  ])
+
+  const ids = new Set<string>()
+  for (const row of vectorRes.data || []) ids.add(row.id)
+  for (const row of kronoRes.data || []) ids.add(row.id)
+  for (const row of terlaporLinkRes.data || []) ids.add(row.pengaduan_id)
+  return Array.from(ids)
+}
+
 export async function getPengaduanList(filters: SearchFilters = {}) {
   const supabase = await createClient()
   const tenantId = await requireTenant()
@@ -9,14 +52,22 @@ export async function getPengaduanList(filters: SearchFilters = {}) {
   const page = filters.page || 1
   const limit = filters.limit || 20
 
+  let matchingIds: string[] | undefined
+  if (filters.query) {
+    matchingIds = await getMatchingPengaduanIds(supabase, tenantId, filters.query)
+    if (matchingIds.length === 0) {
+      return { data: [] as Pengaduan[], total: 0, page, limit }
+    }
+  }
+
   let query = supabase
     .from('pengaduan')
     .select('*, klasifikasi(nama), unit:organizations(nama), pengaduan_terlapor(terlapor(nama, pangkat, nrp, jabatan, kesatuan)), berkas:berkas(id, nomor_berkas)', { count: 'exact' })
     .eq('tenant_id', tenantId)
     .range((page - 1) * limit, page * limit - 1)
 
-  if (filters.query) {
-    query = query.textSearch('search_vector', filters.query, { config: 'indonesian' })
+  if (matchingIds) {
+    query = query.in('id', matchingIds)
   }
   if (filters.status?.length) {
     query = query.in('status', filters.status)

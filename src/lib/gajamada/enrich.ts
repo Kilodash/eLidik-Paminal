@@ -69,7 +69,6 @@ export async function enrichGajamadaPengaduan({
       .select('id, gajamada_id, kronologi_lengkap, kronologi, satker_dilaporkan')
       .eq('tenant_id', tenantId)
       .eq('ai_processed', false)
-      .not('gajamada_id', 'is', null)
       .order(orderBy, { ascending: orderDir === 'asc' })
 
     if (!pengaduanRows || pengaduanRows.length === 0) {
@@ -88,12 +87,12 @@ export async function enrichGajamadaPengaduan({
       if (maxItems !== undefined && processed >= maxItems) break
 
       const row = pengaduanRows[i]
-      const content = row.kronologi_lengkap
+      const content = row.kronologi_lengkap || row.kronologi || ''
 
       try {
         let summary = content || '-'
         let satker: string | null = row.satker_dilaporkan
-        let terlaporParsed: Record<string, string | null> = {}
+        const terlaporParsed: Record<string, string | null> = {}
 
     if (hasAI && content) {
       // Run all 3 AI calls concurrently (not sequentially)
@@ -201,7 +200,7 @@ export async function enrichSinglePengaduan({
 
     const { data: row } = await admin
       .from('pengaduan')
-      .select('id, gajamada_id, kronologi_lengkap, satker_dilaporkan, ai_processed')
+      .select('id, gajamada_id, kronologi_lengkap, kronologi, satker_dilaporkan, ai_processed')
       .eq('id', pengaduanId)
       .eq('tenant_id', tenantId)
       .single()
@@ -209,7 +208,7 @@ export async function enrichSinglePengaduan({
     if (!row) return { success: false, error: 'Pengaduan tidak ditemukan' }
     if (row.ai_processed) return { success: false, error: 'Pengaduan ini sudah diproses AI sebelumnya' }
 
-    const content = row.kronologi_lengkap
+    const content = row.kronologi_lengkap || row.kronologi || ''
     if (!content) return { success: false, error: 'Tidak ada kronologi untuk diproses' }
 
     const { data: satkers } = await admin.from('wilayah_satker').select('nama').eq('tenant_id', tenantId)

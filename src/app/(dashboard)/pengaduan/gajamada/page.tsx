@@ -5,6 +5,7 @@ import { getPersonel } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { MonitoringSearch } from '@/components/pengaduan/monitoring-search'
+import { AiEnrichAllButton } from '@/components/pengaduan/ai-enrich-all-button'
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -37,9 +38,12 @@ export default async function GajamadaMonitoringPage({ searchParams }: Props) {
             Pengaduan Cepat Propam yang masuk dari Gajamada ({total} data)
           </p>
         </div>
-        <Link href="/pengaduan">
-          <Button type="button" variant="outline" size="sm">Kembali</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {(personel.role === 'admin_subbid' || personel.role === 'oversight') && <AiEnrichAllButton />}
+          <Link href="/pengaduan">
+            <Button type="button" variant="outline" size="sm">Kembali</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-4">

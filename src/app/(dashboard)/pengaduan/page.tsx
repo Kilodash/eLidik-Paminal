@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import { getPengaduanList, getPengaduanById } from '@/lib/data/pengaduan'
 import { getWilayahSatkerList, getJenisPengaduanList, getUnitList } from '@/lib/data/master'
 import { getPersonel } from '@/lib/auth'
-import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { PengaduanTable } from '@/components/layout/pengaduan-table'
 import { ResizableFormTableLayout } from '@/components/layout/resizable-form-table-layout'
@@ -27,6 +26,8 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DistribusiForm } from '@/components/pengaduan/distribusi-form'
+import { AiEnrichButton } from '@/components/pengaduan/ai-enrich-button'
+import { SyncGajamadaButton } from '@/components/pengaduan/sync-gajamada-button'
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -48,12 +49,25 @@ export default async function PengaduanListPage({ searchParams }: Props) {
     editData = await getPengaduanById(editId).catch(() => null)
   }
 
+  const terlaporFull = (() => {
+    if (!editData?.pengaduan_terlapor?.[0]?.terlapor) return ''
+    const t = editData.pengaduan_terlapor[0].terlapor
+    const parts: string[] = []
+    if (t.pangkat) parts.push(t.pangkat)
+    if (t.nama) parts.push(t.nama)
+    if (t.nrp) parts.push(`nrp ${t.nrp}`)
+    if (t.jabatan) parts.push(`jabatan ${t.jabatan}`)
+    return parts.join(', ') || t.nama || ''
+  })()
+
   const page = parseInt(String(sp.page || '1'))
   const query = String(sp.q || '')
   const statusParam = String(sp.status || '')
   const unitId = String(sp.unit || '')
   const klasifikasiId = String(sp.klasifikasi || '')
   const overdue = sp.overdue === 'true'
+  const sortBy = String(sp.sort || 'created_at')
+  const sortOrder = (sp.order === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc'
 
   const { data, total } = await getPengaduanList({
     page,
@@ -62,11 +76,24 @@ export default async function PengaduanListPage({ searchParams }: Props) {
     unitId: unitId || undefined,
     klasifikasiId: klasifikasiId || undefined,
     overdue: overdue || undefined,
+    sortBy,
+    sortOrder,
   })
 
   return (
     <div className="w-full h-full flex flex-col flex-1 overflow-hidden">
-      <PageHeader title="Pengaduan" description="Daftar pengaduan masyarakat dan laporan informasi" />
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
+        <div>
+          <h1 className="text-lg font-bold">Pengaduan</h1>
+          <p className="text-sm text-muted-foreground">Daftar pengaduan masyarakat dan laporan informasi</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {(personel.role === 'admin_subbid' || personel.role === 'oversight') && <SyncGajamadaButton />}
+          <Link href="/pengaduan/gajamada">
+            <Button type="button" variant="outline" size="sm">Monitoring Gajamada</Button>
+          </Link>
+        </div>
+      </div>
 
       <ResizableFormTableLayout
         showForm={personel.role !== 'operator_unit'}
@@ -74,7 +101,7 @@ export default async function PengaduanListPage({ searchParams }: Props) {
           <>
             <img src="/logo-simondu.png" alt="Logo SIMONDU" className="w-full h-auto object-cover" />
 
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col">
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col relative">
               <div className="flex justify-between items-center mb-4">
                 <span className="text-sm font-bold">No. Berkas</span>
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -106,17 +133,17 @@ export default async function PengaduanListPage({ searchParams }: Props) {
 
                 <div className="grid grid-cols-[110px_1fr] items-center gap-2 shrink-0">
                   <Label className="font-semibold">Pelapor</Label>
-                  <NameInput id="pelapor_nama" name="pelapor_nama" required minLength={3} maxLength={500} defaultValue={editData?.pelapor_nama || ''} className="h-8" />
+                  <NameInput key={editData?.id || 'pelapor'} id="pelapor_nama" name="pelapor_nama" required minLength={3} maxLength={500} defaultValue={editData?.pelapor_nama || ''} className="h-8" />
                 </div>
 
                 <div className="grid grid-cols-[110px_1fr] items-center gap-2 shrink-0">
                   <Label className="font-semibold">Terlapor *</Label>
-                  <NameInput id="terlapor_nama" name="terlapor_nama" required minLength={3} maxLength={500} defaultValue={editData?.pengaduan_terlapor?.[0]?.terlapor?.nama || ''} className="h-8" />
+                  <NameInput key={editData?.id || 'terlapor'} id="terlapor_nama" name="terlapor_nama" required minLength={3} maxLength={500} defaultValue={terlaporFull} className="h-8" />
                 </div>
 
                 <div className="grid grid-cols-[110px_1fr] items-center gap-2 shrink-0">
                   <Label className="font-semibold">Satwil/Satker *</Label>
-                  <Select name="satker_dilaporkan" defaultValue={editData?.satker_dilaporkan || undefined} required>
+                  <Select key={editData?.id || 'new-select'} name="satker_dilaporkan" defaultValue={editData?.satker_dilaporkan || undefined} required>
                     <SelectTrigger key="trigger" className="h-8 w-full">
                       <SelectValue />
                     </SelectTrigger>
@@ -176,6 +203,9 @@ export default async function PengaduanListPage({ searchParams }: Props) {
                   )}
                 </div>
               </PengaduanClientForm>
+              {editData && (
+                <AiEnrichButton pengaduanId={editData.id} aiProcessed={editData.ai_processed} />
+              )}
             </div>
           </>
         }
@@ -193,7 +223,7 @@ export default async function PengaduanListPage({ searchParams }: Props) {
 
             <TabsContent value="tabel-dumas" className="flex-1 m-0 flex flex-col overflow-hidden outline-none">
               <div className="flex-1 overflow-auto p-4 custom-scrollbar">
-                <PengaduanTable data={data} total={total} page={page} query={query} userRole={personel.role} userId={personel.id} />
+                <PengaduanTable data={data} total={total} page={page} query={query} userRole={personel.role} userId={personel.id} sortBy={sortBy} sortOrder={sortOrder} />
               </div>
             </TabsContent>
                         {(personel.role === "admin_subbid" || personel.role === "oversight") && <TabsContent value="tindak-lanjut" className="flex-1 m-0 p-4 overflow-y-auto">

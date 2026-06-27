@@ -3,7 +3,14 @@
 import { createPengaduan, updatePengaduan, deletePengaduan, mergePengaduanToBerkas, splitPengaduanFromBerkas } from '@/lib/data/pengaduan'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireTenant } from '@/lib/auth'
+import { requireTenant, requireRole } from '@/lib/auth'
+import { syncGajamadaIntake } from '@/lib/gajamada/sync'
+import { enrichGajamadaPengaduan, enrichSinglePengaduan } from '@/lib/gajamada/enrich'
+
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return String(err)
+}
 
 export async function savePengaduan(formData: FormData) {
   try {
@@ -470,6 +477,109 @@ export async function updateDistribusiAction(pengaduanId: string, unitId: string
   } catch (error: any) {
     console.error('Error in distribusi:', error)
     return { error: error.message || 'Gagal menyimpan distribusi' }
+  }
+}
+
+
+export async function syncGajamadaIntakeAction() {
+  try {
+    const personel = await requireRole('admin_subbid', 'oversight')
+    if (!personel) return { error: 'Akses ditolak' }
+
+    const tenantId = await requireTenant()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const createdBy = (personel as any).id as string
+
+    const result = await syncGajamadaIntake({ tenantId, createdBy })
+
+    if (!result.success) return { error: result.error }
+
+    revalidatePath('/pengaduan')
+    return { success: true, count: result.count, skipped: result.skipped }
+  } catch (error: unknown) {
+    console.error('Error syncing Gajamada intake:', error)
+    return { error: getErrorMessage(error) || 'Gagal sinkron Gajamada' }
+  }
+}
+
+export async function enrichGajamadaAction(maxItems?: number, orderBy?: string, orderDir?: string) {
+  try {
+    await requireRole('admin_subbid', 'oversight')
+    const tenantId = await requireTenant()
+
+    const result = await enrichGajamadaPengaduan({ tenantId, maxItems, orderBy, orderDir })
+
+    if (!result.success) return { error: result.error }
+
+    revalidatePath('/pengaduan')
+    return { success: true, processed: result.processed, errors: result.errors, remaining: result.remaining }
+  } catch (error: unknown) {
+    console.error('Error enriching Gajamada:', error)
+    return { error: getErrorMessage(error) || 'Gagal enrichment AI' }
+  }
+}
+
+export async function resetGajamadaAIAction(pengaduanId: string) {
+  try {
+    await requireRole('admin_subbid', 'oversight')
+    const tenantId = await requireTenant()
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('pengaduan')
+      .update({ ai_processed: false })
+      .eq('id', pengaduanId)
+      .eq('tenant_id', tenantId)
+
+    if (error) throw error
+
+    revalidatePath('/pengaduan')
+    return { success: true }
+  } catch (error: unknown) {
+    console.error('Error resetting AI:', error)
+    return { error: getErrorMessage(error) || 'Gagal reset AI' }
+  }
+}
+
+export async function getGajamadaProgressAction() {
+  try {
+    const supabase = await createClient()
+    const tenantId = await requireTenant()
+
+    const { count: total } = await supabase
+      .from('pengaduan')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .not('gajamada_id', 'is', null)
+
+    const { count: processed } = await supabase
+      .from('pengaduan')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .not('gajamada_id', 'is', null)
+      .eq('ai_processed', true)
+
+    return { total: total || 0, processed: processed || 0 }
+  } catch (error: unknown) {
+    console.error('Error getting Gajamada progress:', error)
+    return { total: 0, processed: 0 }
+  }
+}
+
+export async function enrichSinglePengaduanAction(pengaduanId: string) {
+  try {
+    await requireRole('admin_subbid', 'oversight')
+    const tenantId = await requireTenant()
+
+    const result = await enrichSinglePengaduan({ tenantId, pengaduanId })
+
+    if (!result.success) return { error: result.error }
+
+    revalidatePath('/pengaduan')
+    return { success: true }
+  } catch (error: unknown) {
+    console.error('Error enriching single pengaduan:', error)
+    return { error: getErrorMessage(error) || 'Gagal enrichment AI' }
   }
 }
 

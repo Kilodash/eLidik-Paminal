@@ -22,6 +22,7 @@ import {
   Variable,
   Wrench,
   LayoutTemplate,
+  Sparkles,
 } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 
@@ -40,6 +41,7 @@ const pengaturanItems = [
   { href: '/pengaturan/klasifikasi', label: 'Klasifikasi', icon: Tags },
   { href: '/pengaturan/variabel', label: 'Variabel Dokumen', icon: Variable },
   { href: '/pengaturan/sistem', label: 'Sistem Lain', icon: Wrench },
+  { href: '/pengaturan/ai', label: 'Pengaturan AI', icon: Sparkles },
   { href: '/master/template-variabel', label: 'Template Variabel', icon: LayoutTemplate },
 ]
 

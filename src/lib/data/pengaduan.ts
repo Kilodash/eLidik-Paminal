@@ -11,9 +11,8 @@ export async function getPengaduanList(filters: SearchFilters = {}) {
 
   let query = supabase
     .from('pengaduan')
-    .select('*, klasifikasi(nama), unit:organizations(nama), pengaduan_terlapor(terlapor(nama)), berkas:berkas(id, nomor_berkas)', { count: 'exact' })
+    .select('*, klasifikasi(nama), unit:organizations(nama), pengaduan_terlapor(terlapor(nama, pangkat, nrp, jabatan, kesatuan)), berkas:berkas(id, nomor_berkas)', { count: 'exact' })
     .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: false })
     .range((page - 1) * limit, page * limit - 1)
 
   if (filters.query) {
@@ -30,9 +29,17 @@ export async function getPengaduanList(filters: SearchFilters = {}) {
   if (filters.klasifikasiId) {
     query = query.eq('klasifikasi_id', filters.klasifikasiId)
   }
+  if (filters.jenis) {
+    query = query.eq('jenis', filters.jenis)
+  }
   if (filters.tglFrom) query = query.gte('tgl_pengaduan', filters.tglFrom)
   if (filters.tglTo) query = query.lte('tgl_pengaduan', filters.tglTo)
   if (filters.atensi) query = query.eq('atensi', true)
+
+  // Sort
+  const sortBy = filters.sortBy || 'created_at'
+  const sortOrder = filters.sortOrder === 'asc'
+  query = query.order(sortBy, { ascending: sortOrder })
 
   const { data, count, error } = await query
   if (error) throw error

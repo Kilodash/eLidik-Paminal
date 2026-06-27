@@ -215,7 +215,7 @@ export function RegisterSuratTable() {
                       }).join(', ')
                     : 'Belum ada terlapor'
                   unit = satker || '-'
-                  pertains = `${jenisText} tanggal ${formatDateLocal(p.tgl_pengaduan)} a.n. pelapor ${pelaporText}, terlapor ${terlaporText} tentang ${p.kronologi || '-'}`
+                  perihal = `${jenisText} tanggal ${formatDateLocal(p.tgl_pengaduan)} a.n. pelapor ${pelaporText}, terlapor ${terlaporText} tentang ${p.kronologi || '-'}`
                 }
                 const docTypeName = docTypes.find(dt => dt.kode === item.tahap)?.nama || item.tahap || '-'
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
@@ -80,10 +81,10 @@ export function DistribusiForm({ pengaduanId, currentUnitId, units, initialDispo
     const res = await updateDistribusiAction(pengaduanId, unitId, combinedCatatan.trim(), disposisiKabid, disposisiKasubbid, [catatanTambahanKabid, catatanTambahanKasubbid].filter(Boolean).join(' | '))
     setIsSubmitting(false)
     if (res.success) {
-      alert('Distribusi berhasil disimpan.')
+      toast.success('Distribusi berhasil disimpan.')
       router.refresh()
     } else {
-      alert(res.error || 'Gagal menyimpan distribusi.')
+      toast.error(res.error || 'Gagal menyimpan distribusi.')
     }
   }
 
@@ -169,7 +170,7 @@ export function DistribusiForm({ pengaduanId, currentUnitId, units, initialDispo
       </div>
 
       <Button type="submit" disabled={isSubmitting || !unitId || unitId === currentUnitId}>
-        {isSubmitting ? 'Menyimpan...' : 'Simpan Distribusi & Disposisi'}
+        {isSubmitting ? 'Menyimpan...' : unitId === currentUnitId ? 'Unit sama dengan saat ini' : 'Simpan Distribusi & Disposisi'}
       </Button>
     </form>
   )

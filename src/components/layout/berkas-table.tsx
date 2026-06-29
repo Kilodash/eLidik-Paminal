@@ -1,6 +1,6 @@
 'use client'
 
-import { redirect } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { DataTable } from '@/components/ui/data-table'
 import { StatusBadge } from '@/components/ui/status-badge'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -60,6 +60,7 @@ interface Props {
 }
 
 export function BerkasTable({ data, total, page }: Props) {
+  const router = useRouter()
   return (
     <DataTable
       columns={columns}
@@ -68,7 +69,7 @@ export function BerkasTable({ data, total, page }: Props) {
       searchPlaceholder="Cari nomor berkas..."
       totalCount={total}
       page={page}
-      onRowClick={(row) => redirect(`/berkas/${row.id}`)}
+      onRowClick={(row) => router.push(`/berkas/${row.id}`)}
     />
   )
 }

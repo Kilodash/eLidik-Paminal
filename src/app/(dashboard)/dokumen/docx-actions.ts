@@ -48,6 +48,12 @@ export async function getDocxTemplateAction(documentTypeKode: string) {
   }
 }
 
+function humanizeKey(key: string): string {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+}
+
 export async function uploadDocxTemplateAction(
   documentTypeKode: string,
   formData: FormData,
@@ -103,9 +109,71 @@ export async function uploadDocxTemplateAction(
       })
   }
 
+  // Auto-detect {{placeholders}} dari template dan seed ke template_variables
+  const PizZip = (await import('pizzip')).default
+  const zip = new PizZip(buffer)
+  const placeholdersSet = new Set<string>()
+  const candidates = ['word/document.xml']
+
+  for (const name of Object.keys(zip.files)) {
+    if (/^word\/(header|footer)\d*\.xml$/.test(name)) candidates.push(name)
+  }
+
+  for (const name of candidates) {
+    const zf = zip.file(name)
+    if (!zf) continue
+    let xml = zf.asText()
+    if (xml.indexOf('{{') !== -1) {
+      xml = repairTemplateXml(xml)
+    }
+    const found = [...xml.matchAll(/\{\{([^{}]+)\}\}/g)].map(m => m[1].trim())
+    for (const f of found) placeholdersSet.add(f)
+  }
+
+  const placeholders = [...placeholdersSet]
+  let inserted = 0
+
+  if (placeholders.length > 0) {
+    // Ambil existing variable keys
+    const { data: existingVars } = await supabase
+      .from('template_variables')
+      .select('variable_key')
+      .eq('document_type_kode', documentTypeKode)
+
+    const existingKeys = new Set((existingVars || []).map(v => v.variable_key))
+    const newVars = placeholders.filter(k => !existingKeys.has(k))
+
+    if (newVars.length > 0) {
+      const maxOrder = existingVars?.length
+        ? Math.max(...existingVars.map(v => 0), 0)
+        : 0
+
+      const rows = newVars.map((key, i) => ({
+        document_type_kode: documentTypeKode,
+        variable_key: key,
+        variable_label: humanizeKey(key),
+        source: 'user_input',
+        input_type: 'text',
+        display_order: maxOrder + i + 1,
+        display_group: 'Umum',
+      }))
+
+      const { error: seedErr } = await supabase
+        .from('template_variables')
+        .upsert(rows, { onConflict: 'document_type_kode,variable_key' })
+
+      if (!seedErr) inserted = rows.length
+    }
+  }
+
   invalidateTemplateCache(storagePath)
   revalidatePath(`/dokumen/${documentTypeKode}`)
-  return { success: true, path: storagePath }
+  return {
+    success: true,
+    path: storagePath,
+    placeholdersDetected: placeholders.length,
+    placeholdersInserted: inserted,
+  }
 }
 
 export async function removeDocxTemplateAction(documentTypeKode: string) {

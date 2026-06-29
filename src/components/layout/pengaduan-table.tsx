@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { DataTable } from '@/components/ui/data-table'
-import { Search, GitMerge, Trash2, Unlink } from 'lucide-react'
+import { Search, GitMerge, Trash2, Unlink, RotateCcw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, Handshake, Info } from 'lucide-react'
@@ -44,8 +45,9 @@ type PengaduanRow = {
   nomor_register: string | null
   jenis: string
   pelapor_nama: string | null
-  pengaduan_terlapor?: { terlapor: { nama: string } }[]
+  pengaduan_terlapor?: { terlapor: { nama: string; pangkat?: string | null; nrp?: string | null; jabatan?: string | null; kesatuan?: string | null } }[]
   kronologi: string | null
+  kronologi_lengkap?: string | null
   satker_dilaporkan: string | null
   klasifikasi?: unknown
   unit?: unknown
@@ -62,10 +64,13 @@ interface Props {
   query?: string
   userRole: string
   userId: string
+  sortBy: string
+  sortOrder: 'asc' | 'desc'
 }
 
-export function PengaduanTable({ data, total, page, query = '', userRole, userId }: Props) {
+export function PengaduanTable({ data, total, page, query = '', userRole, userId, sortBy = 'tgl_pengaduan', sortOrder = 'desc' }: Props) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [localQuery, setLocalQuery] = useState(query)
 
   // State for Modals
@@ -105,6 +110,26 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
     nd_saran_penghentian: false,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [ctrlHeld, setCtrlHeld] = useState(false)
+  const [kronologiLocked, setKronologiLocked] = useState(false)
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'Control') setCtrlHeld(true)
+      if (e.ctrlKey && e.shiftKey && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && !e.repeat) {
+        e.preventDefault()
+        setKronologiLocked(prev => !prev)
+      }
+    }
+    const up = (e: KeyboardEvent) => { if (e.key === 'Control') setCtrlHeld(false) }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
+  }, [])
 
   const [perdamaianDate, setPerdamaianDate] = useState<Date | undefined>(undefined)
   const [pihakHadir, setPihakHadir] = useState('pelapor, terlapor, saksi')
@@ -196,14 +221,14 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
     }
   }
 
-  const openMergeModal = async (row: PengaduanRow) => {
+  const openMergeModal = useCallback(async (row: PengaduanRow) => {
     setSelectedRow(row)
     setIsMergeOpen(true)
     const res = await getActiveBerkasListAction()
     if (res.data) {
       setActiveBerkas(res.data)
     }
-  }
+  }, [])
 
   const handleDelete = async () => {
     if (!selectedRow || !alasanHapus.trim()) return
@@ -216,7 +241,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
       setSelectedRow(null)
       router.refresh()
     } else {
-      alert(res.error || 'Gagal membatalkan dumas')
+      toast.error(res.error || 'Gagal membatalkan dumas')
     }
   }
 
@@ -231,7 +256,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
       setSelectedRow(null)
       router.refresh()
     } else {
-      alert(res.error || 'Gagal menggabungkan dumas')
+      toast.error(res.error || 'Gagal menggabungkan dumas')
     }
   }
 
@@ -245,7 +270,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
       setSelectedRow(null)
       router.refresh()
     } else {
-      alert(res.error || 'Gagal memisahkan dumas')
+      toast.error(res.error || 'Gagal memisahkan dumas')
     }
   }
 
@@ -263,7 +288,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
       setSelectedRow(null)
       router.refresh()
     } else {
-      alert(res.error || 'Gagal mengajukan perdamaian')
+      toast.error(res.error || 'Gagal mengajukan perdamaian')
     }
   }
 
@@ -274,9 +299,9 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
     setIsSubmitting(false)
     if (res.success) {
       setTindakLanjutDocs(prev => ({ ...prev, [key]: true }))
-      alert(res.message || `Dokumen ${docNama} berhasil dibuat!`)
+      toast.success(res.message || `Dokumen ${docNama} berhasil dibuat!`)
     } else {
-      alert(res.error || 'Gagal membuat dokumen')
+      toast.error(res.error || 'Gagal membuat dokumen')
     }
   }
 
@@ -294,14 +319,15 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
     router.push(`/pengaduan?${params.toString()}`)
   }
 
-  const columns: ColumnDef<PengaduanRow>[] = [
+  const columns = useMemo<ColumnDef<PengaduanRow>[]>(() => [
     {
       id: 'nomor_urut',
       header: 'No',
       cell: ({ row }) => {
+        const offset = (page - 1) * 20
         return (
           <div className="flex flex-col gap-1 w-8">
-            <span className="font-medium">{row.index + 1}</span>
+            <span className="font-medium">{offset + row.index + 1}</span>
           </div>
         )
       },
@@ -315,7 +341,26 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
     },
     {
       accessorKey: 'tgl_pengaduan',
-      header: 'Tanggal',
+      header: () => {
+        const nextOrder = sortBy === 'tgl_pengaduan' && sortOrder === 'desc' ? 'asc' : 'desc'
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('sort', 'tgl_pengaduan')
+        params.set('order', nextOrder)
+        params.set('page', '1')
+        return (
+          <button
+            type="button"
+            className="flex items-center gap-1 hover:text-primary"
+            onClick={(e) => {
+              e.stopPropagation()
+              router.push(`/pengaduan?${params.toString()}`)
+            }}
+          >
+            Tanggal
+            {sortBy === 'tgl_pengaduan' ? (sortOrder === 'asc' ? ' ↑' : ' ↓') : ''}
+          </button>
+        )
+      },
       cell: ({ row }) => <div className="text-center whitespace-nowrap w-[80px]">{row.original.tgl_pengaduan || '-'}</div>,
     },
     {
@@ -330,10 +375,32 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
         const terlaporArr = row.original.pengaduan_terlapor || []
         if (terlaporArr.length === 0) return <span>-</span>
         return (
-          <div className="flex flex-col gap-0.5 whitespace-normal max-w-[120px]">
-            {terlaporArr.map((t, i) => (
-              <span key={i} className="font-medium leading-tight">{formatNameCase(t.terlapor?.nama)}</span>
-            ))}
+          <div className="flex flex-col gap-0.5 whitespace-normal max-w-[200px]">
+            {terlaporArr.map((t, i) => {
+              const tl = t.terlapor
+              const pangkat = tl?.pangkat?.trim() || ''
+              const nama = tl?.nama?.trim()
+              const nrp = tl?.nrp?.trim() || ''
+              const jabatan = tl?.jabatan?.trim() || ''
+              const kesatuan = tl?.kesatuan?.trim() || ''
+
+              const parts: string[] = []
+              if (pangkat) parts.push(pangkat)
+              if (nama && nama !== '-' && nama !== 'Anggota Polri (identitas belum dikenali)') {
+                parts.push(nama)
+              }
+              if (nrp && nrp !== 'xxxxxxxx') parts.push(`nrp ${nrp}`)
+              if (jabatan) parts.push(jabatan)
+              if (kesatuan && !jabatan.includes(kesatuan)) parts.push(kesatuan)
+
+              const line = parts.join(', ') || 'Anggota'
+
+              return (
+                <span key={i} className="font-medium leading-tight text-xs">
+                  {line}
+                </span>
+              )
+            })}
           </div>
         )
       },
@@ -341,13 +408,20 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
     {
       accessorKey: 'kronologi',
       header: 'Isi Dumas / Kronologis',
-      cell: ({ row }) => (
-        <div className="flex flex-col gap-1.5 w-full min-w-[250px]">
-          <div className="whitespace-pre-wrap text-justify">
-            {row.original.kronologi || '-'}
+      cell: ({ row }) => {
+        const hasLengkap = !!(row.original.kronologi_lengkap && row.original.kronologi_lengkap !== row.original.kronologi)
+        const displayText = kronologiLocked && hasLengkap ? row.original.kronologi_lengkap : (row.original.kronologi || '-')
+        return (
+          <div className="flex flex-col gap-1.5 w-full min-w-[250px]">
+            <div className="whitespace-pre-wrap text-justify">
+              {displayText}
+            </div>
+            {kronologiLocked && hasLengkap && (
+              <span className="text-[10px] text-primary/60 font-medium">Ctrl+Shift: kronologi asli (terkunci)</span>
+            )}
           </div>
-        </div>
-      ),
+        )
+      },
     },
     {
       accessorKey: 'unit',
@@ -393,6 +467,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
                 }}
                 className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition-colors font-semibold border border-blue-200"
                 title="Gabung Dumas"
+                aria-label="Gabung dumas ke berkas"
               >
                 <GitMerge className="w-4 h-4" />
               </button>
@@ -405,6 +480,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
                 }}
                 className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded transition-colors font-semibold border border-amber-200"
                 title="Pisahkan dari Berkas"
+                aria-label="Pisahkan dumas dari berkas"
               >
                 <Unlink className="w-4 h-4" />
               </button>
@@ -419,6 +495,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
                 }}
                 className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded transition-colors font-semibold border border-red-200"
                 title="Hapus Dumas"
+                aria-label="Hapus dumas"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -433,6 +510,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
                 }}
                 className="p-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded transition-colors font-semibold border border-teal-200"
                 title="Ajukan Perdamaian"
+                aria-label="Ajukan perdamaian"
               >
                 <Handshake className="w-4 h-4" />
               </button>
@@ -441,7 +519,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
         )
       },
     },
-  ]
+  ], [page, searchParams, sortBy, sortOrder, userRole, openMergeModal, router, kronologiLocked])
 
   const isSyaratLengkap = syaratPerdamaian.materil_keresahan &&
     syaratPerdamaian.materil_konflik &&
@@ -473,6 +551,19 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
         <Button type="button" variant="secondary" size="sm" onClick={executeSearch} className="h-9">
           Cari
         </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-9 px-2"
+          title="Reset pencarian"
+          onClick={() => {
+            setLocalQuery('')
+            router.push('/pengaduan')
+          }}
+        >
+          <RotateCcw className="h-4 w-4" />
+        </Button>
       </div>
 
       <DataTable
@@ -481,7 +572,11 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
         totalCount={total}
         page={page}
         onPageChange={handlePageChange}
-        onRowClick={(row) => router.push(`/pengaduan?edit=${row.id}`)}
+        onRowClick={(row) => {
+          const params = new URLSearchParams(searchParams.toString())
+          params.set('edit', row.id)
+          router.push(`/pengaduan?${params.toString()}`)
+        }}
         bordered
       />
 

@@ -190,11 +190,13 @@ export async function getAvailablePengaduan(unitId?: string): Promise<Pengaduan[
     .from('pengaduan')
     .select('*')
     .eq('tenant_id', tenantId)
-    .is('berkas_id', null)  // belum digabung ke berkas
+    .is('berkas_id', null)
+    .order('created_at', { ascending: false })
+    .limit(100)
 
   if (unitId) query = query.eq('unit_id', unitId)
 
-  const { data } = await query.order('created_at', { ascending: false })
+  const { data } = await query
   return (data || []) as Pengaduan[]
 }
 

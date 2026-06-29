@@ -99,6 +99,16 @@ export interface Pengaduan {
   disposisi_tambahan?: string | null
   created_by: string | null
   created_at: string
+  // Gajamada
+  gajamada_id?: string | null
+  gajamada_status?: string | null
+  gajamada_synced_at?: string | null
+  pelapor_email?: string | null
+  pelapor_nik?: string | null
+  pelapor_total_report?: number | null
+  kronologi_lengkap?: string | null
+  tgl_kejadian?: string | null
+  ai_processed?: boolean | null
   // joined
   klasifikasi?: Klasifikasi | null
   unit?: Organization | null
@@ -216,12 +226,15 @@ export interface SearchFilters {
   status?: string[]
   unitId?: string
   klasifikasiId?: string
+  jenis?: string
   tglFrom?: string
   tglTo?: string
   overdue?: boolean
   atensi?: boolean
   page?: number
   limit?: number
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
 }
 
 export interface DashboardStats {

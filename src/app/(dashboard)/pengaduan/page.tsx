@@ -1,9 +1,8 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getPengaduanList, getPengaduanById } from '@/lib/data/pengaduan'
-import { getWilayahSatkerList, getJenisPengaduanList, getUnitList } from '@/lib/data/master'
+import { getWilayahSatkerList, getJenisPengaduanList, getUnitList, getKlasifikasiList } from '@/lib/data/master'
 import { getPersonel } from '@/lib/auth'
-import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { PengaduanTable } from '@/components/layout/pengaduan-table'
 import { ResizableFormTableLayout } from '@/components/layout/resizable-form-table-layout'
@@ -25,11 +24,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { JenisDumasSelect } from './jenis-dumas-select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DistribusiForm } from '@/components/pengaduan/distribusi-form'
-
-import { PropamImportModal } from './propam-import-modal'
+import { AiEnrichButton } from '@/components/pengaduan/ai-enrich-button'
+import { EmptyState } from '@/components/ui/empty-state'
+import { PengaduanFormNav } from '@/components/pengaduan/pengaduan-form-nav'
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -41,15 +40,33 @@ export default async function PengaduanListPage({ searchParams }: Props) {
 
   const wilayahSatker = await getWilayahSatkerList()
   const jenisPengaduan = await getJenisPengaduanList()
+  const klasifikasiList = await getKlasifikasiList()
   const units = await getUnitList()
 
   const sp = await searchParams
-  const editId = sp.edit as string | undefined
+  const editIdRaw = sp.edit as string | undefined
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let editData: any = null
-  if (editId) {
-    editData = await getPengaduanById(editId).catch(() => null)
+  let editId: string | undefined = editIdRaw
+
+  if (editIdRaw) {
+    if (editIdRaw === '_first') {
+      editId = undefined // will resolve after data fetch
+    } else {
+      editData = await getPengaduanById(editIdRaw).catch(() => null)
+    }
   }
+
+  const terlaporFull = (() => {
+    if (!editData?.pengaduan_terlapor?.[0]?.terlapor) return ''
+    const t = editData.pengaduan_terlapor[0].terlapor
+    const parts: string[] = []
+    if (t.pangkat) parts.push(t.pangkat)
+    if (t.nama) parts.push(t.nama)
+    if (t.nrp) parts.push(`nrp ${t.nrp}`)
+    if (t.jabatan) parts.push(`jabatan ${t.jabatan}`)
+    return parts.join(', ') || t.nama || ''
+  })()
 
   const page = parseInt(String(sp.page || '1'))
   const query = String(sp.q || '')
@@ -57,6 +74,8 @@ export default async function PengaduanListPage({ searchParams }: Props) {
   const unitId = String(sp.unit || '')
   const klasifikasiId = String(sp.klasifikasi || '')
   const overdue = sp.overdue === 'true'
+  const sortBy = String(sp.sort || 'tgl_pengaduan')
+  const sortOrder = (sp.order === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc'
 
   const { data, total } = await getPengaduanList({
     page,
@@ -65,25 +84,50 @@ export default async function PengaduanListPage({ searchParams }: Props) {
     unitId: unitId || undefined,
     klasifikasiId: klasifikasiId || undefined,
     overdue: overdue || undefined,
+    sortBy,
+    sortOrder,
   })
 
-  return (
-    <div className="w-full h-full flex flex-col flex-1 overflow-hidden">
-      <div className="flex justify-between items-center px-4 py-2 bg-muted/20 border-b">
-        <div>
-          <h1 className="text-xl font-bold">Pengaduan</h1>
-          <p className="text-sm text-muted-foreground">Daftar pengaduan masyarakat dan laporan informasi</p>
-        </div>
-        <PropamImportModal />
-      </div>
+  // Resolve _first marker to actual first ID on this page
+  if (editIdRaw === '_first' && data.length > 0) {
+    editId = data[0].id
+    editData = await getPengaduanById(editId).catch(() => null)
+  }
 
-      <ResizableFormTableLayout
+  const pengaduanIds = data.map((row) => row.id)
+
+  const baseParams = (() => {
+    const params = new URLSearchParams()
+    const add = (key: string, value: string | string[] | undefined) => {
+      if (value === undefined || value === '') return
+      if (Array.isArray(value)) {
+        value.forEach((v) => params.append(key, v))
+      } else {
+        params.set(key, value)
+      }
+    }
+    add('q', sp.q)
+    add('status', sp.status)
+    add('unit', sp.unit)
+    add('klasifikasi', sp.klasifikasi)
+    add('overdue', sp.overdue)
+    add('sort', sp.sort)
+    add('order', sp.order)
+    add('page', sp.page)
+    return params.toString()
+  })()
+
+  return (
+      <div className="w-full h-full flex flex-col flex-1 overflow-hidden">
+        <PengaduanFormNav ids={pengaduanIds} currentId={editId} baseParams={baseParams} page={page} hasNextPage={page * 20 < total} focusFirst={editIdRaw === '_first'} />
+
+        <ResizableFormTableLayout
         showForm={personel.role !== 'operator_unit'}
         formPanel={
           <>
             <img src="/logo-simondu.png" alt="Logo SIMONDU" className="w-full h-auto object-cover" />
 
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col">
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar flex flex-col relative">
               <div className="flex justify-between items-center mb-4">
                 <span className="text-sm font-bold">No. Berkas</span>
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -96,12 +140,12 @@ export default async function PengaduanListPage({ searchParams }: Props) {
                 
                 <div className="grid grid-cols-[110px_1fr] items-center gap-2 shrink-0">
                   <Label className="font-semibold">Tanggal Terima *</Label>
-                  <ClearableDatePicker name="tgl_pengaduan" required value={editData ? new Date(editData.tgl_pengaduan) : new Date()} className="w-full h-8" disableFuture placeholder="" />
+                  <ClearableDatePicker name="tgl_pengaduan" required value={editData ? new Date(editData.tgl_pengaduan) : new Date()} className="w-full h-8" disableFuture placeholder="DD/MM/YYYY" />
                 </div>
 
                 <div className="grid grid-cols-[110px_1fr] items-center gap-2 shrink-0">
                   <Label className="font-semibold">Jenis Dumas *</Label>
-                  <JenisDumasSelect 
+                  <ClearableSelect 
                     name="jenis" 
                     required 
                     defaultValue={editData?.jenis || '--'}
@@ -115,17 +159,17 @@ export default async function PengaduanListPage({ searchParams }: Props) {
 
                 <div className="grid grid-cols-[110px_1fr] items-center gap-2 shrink-0">
                   <Label className="font-semibold">Pelapor</Label>
-                  <NameInput id="pelapor_nama" name="pelapor_nama" required minLength={3} maxLength={500} defaultValue={editData?.pelapor_nama || ''} className="h-8" />
+                  <NameInput key={`pelapor-${editData?.id || 'new'}`} id="pelapor_nama" name="pelapor_nama" required minLength={3} maxLength={500} defaultValue={editData?.pelapor_nama || ''} className="h-8" />
                 </div>
 
                 <div className="grid grid-cols-[110px_1fr] items-center gap-2 shrink-0">
                   <Label className="font-semibold">Terlapor *</Label>
-                  <NameInput id="terlapor_nama" name="terlapor_nama" required minLength={3} maxLength={500} defaultValue={editData?.pengaduan_terlapor?.[0]?.terlapor?.nama || ''} className="h-8" />
+                  <NameInput key={`terlapor-${editData?.id || 'new'}`} id="terlapor_nama" name="terlapor_nama" required minLength={3} maxLength={500} defaultValue={terlaporFull} className="h-8" />
                 </div>
 
                 <div className="grid grid-cols-[110px_1fr] items-center gap-2 shrink-0">
                   <Label className="font-semibold">Satwil/Satker *</Label>
-                  <Select name="satker_dilaporkan" defaultValue={editData?.satker_dilaporkan || undefined} required>
+                  <Select key={`satker-${editData?.id || 'new'}`} name="satker_dilaporkan" defaultValue={editData?.satker_dilaporkan || undefined} required>
                     <SelectTrigger key="trigger" className="h-8 w-full">
                       <SelectValue />
                     </SelectTrigger>
@@ -139,7 +183,7 @@ export default async function PengaduanListPage({ searchParams }: Props) {
 
                 <div className="grid grid-cols-[110px_1fr] items-center gap-2 shrink-0">
                   <Label className="font-semibold">Tanggal Surat *</Label>
-                  <DatePicker name="tgl_surat" required disableFuture className="h-8 w-full" value={editData?.tgl_surat ? new Date(editData.tgl_surat) : undefined} placeholder="" />
+                  <DatePicker name="tgl_surat" required disableFuture className="h-8 w-full" value={editData?.tgl_surat ? new Date(editData.tgl_surat) : undefined} placeholder="DD/MM/YYYY" />
                 </div>
 
                 <div className="grid grid-cols-[110px_1fr] items-center gap-2 shrink-0">
@@ -150,6 +194,20 @@ export default async function PengaduanListPage({ searchParams }: Props) {
                 <div className="grid grid-cols-[110px_1fr] items-start gap-2 pt-1 flex-1 min-h-[100px]">
                   <Label className="font-semibold pt-2 shrink-0">Isi Dumas *</Label>
                   <SentenceCaseTextarea name="kronologi" required minLength={10} maxLength={3000} defaultValue={editData?.kronologi || ''} className="h-full resize-none" />
+                </div>
+
+                <div className="grid grid-cols-[110px_1fr] items-center gap-2 shrink-0">
+                  <Label className="font-semibold">Kategori</Label>
+                  <Select key={`kategori-${editData?.id || 'new'}`} name="klasifikasi_nama" defaultValue={editData?.klasifikasi?.nama || undefined}>
+                    <SelectTrigger className="h-8 w-full">
+                      <SelectValue placeholder="Pilih kategori pelanggaran..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {klasifikasiList.map((k) => (
+                        <SelectItem key={k.id} value={k.nama}>{k.nama}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="grid grid-cols-[110px_1fr] items-start gap-2 pt-1 shrink-0">
@@ -185,12 +243,15 @@ export default async function PengaduanListPage({ searchParams }: Props) {
                   )}
                 </div>
               </PengaduanClientForm>
+              {editData && (
+                <AiEnrichButton pengaduanId={editData.id} aiProcessed={editData.ai_processed} />
+              )}
             </div>
           </>
         }
         tablePanel={
           <Tabs defaultValue="tabel-dumas" className="w-full h-full flex flex-col">
-            <div className="bg-muted/30 border-b border-black pt-2 px-2 overflow-x-auto">
+            <div className="bg-muted/30 border-b border-black pt-2 px-2 flex items-center justify-between">
               <TabsList className="bg-transparent h-auto p-0 flex space-x-1">
                 <TabsTrigger value="tabel-dumas" className="data-[state=active]:bg-card data-[state=active]:border-t-black data-[state=active]:border-x-black border-transparent border-t border-x rounded-t-md rounded-b-none px-4 py-2 text-xs font-bold text-muted-foreground data-[state=active]:text-foreground shadow-none">TABEL DUMAS</TabsTrigger>
                 {(personel.role === "admin_subbid" || personel.role === "oversight") && <TabsTrigger value="tindak-lanjut" className="data-[state=active]:bg-card data-[state=active]:border-t-black data-[state=active]:border-x-black border-transparent border-t border-x rounded-t-md rounded-b-none px-4 py-2 text-xs font-bold text-muted-foreground data-[state=active]:text-foreground shadow-none">DISTRIBUSI</TabsTrigger>}
@@ -198,11 +259,14 @@ export default async function PengaduanListPage({ searchParams }: Props) {
                 <TabsTrigger value="anev-unit" className="data-[state=active]:bg-card data-[state=active]:border-t-black data-[state=active]:border-x-black border-transparent border-t border-x rounded-t-md rounded-b-none px-4 py-2 text-xs font-bold text-muted-foreground data-[state=active]:text-foreground shadow-none">TINJUT HASIL</TabsTrigger>
                 <TabsTrigger value="rekap" className="data-[state=active]:bg-card data-[state=active]:border-t-black data-[state=active]:border-x-black border-transparent border-t border-x rounded-t-md rounded-b-none px-4 py-2 text-xs font-bold text-muted-foreground data-[state=active]:text-foreground shadow-none">REKAP PENANGANAN</TabsTrigger>
               </TabsList>
+              <Link href="/pengaduan/gajamada">
+                <Button type="button" variant="outline" size="sm">Monitoring Gajamada</Button>
+              </Link>
             </div>
 
             <TabsContent value="tabel-dumas" className="flex-1 m-0 flex flex-col overflow-hidden outline-none">
               <div className="flex-1 overflow-auto p-4 custom-scrollbar">
-                <PengaduanTable data={data} total={total} page={page} query={query} userRole={personel.role} userId={personel.id} />
+                <PengaduanTable data={data} total={total} page={page} query={query} userRole={personel.role} userId={personel.id} sortBy={sortBy} sortOrder={sortOrder} />
               </div>
             </TabsContent>
                         {(personel.role === "admin_subbid" || personel.role === "oversight") && <TabsContent value="tindak-lanjut" className="flex-1 m-0 p-4 overflow-y-auto">
@@ -225,13 +289,13 @@ export default async function PengaduanListPage({ searchParams }: Props) {
               </div>
             </TabsContent>}
             <TabsContent value="anev-dumas" className="flex-1 m-0 p-4 overflow-y-auto">
-              <div className="text-sm text-muted-foreground">Konten Penyelidikan</div>
+              <EmptyState title="Penyelidikan" description="Fitur analisa dan evaluasi penyelidikan akan segera tersedia." />
             </TabsContent>
             <TabsContent value="anev-unit" className="flex-1 m-0 p-4 overflow-y-auto">
-              <div className="text-sm text-muted-foreground">Konten Tinjut Hasil</div>
+              <EmptyState title="Tinjut Hasil" description="Fitur tindak lanjut hasil penyelidikan akan segera tersedia." />
             </TabsContent>
             <TabsContent value="rekap" className="flex-1 m-0 p-4 overflow-y-auto">
-              <div className="text-sm text-muted-foreground">Konten Rekap Penanganan</div>
+              <EmptyState title="Rekap Penanganan" description="Fitur rekap penanganan perkara akan segera tersedia." />
             </TabsContent>
           </Tabs>
         }

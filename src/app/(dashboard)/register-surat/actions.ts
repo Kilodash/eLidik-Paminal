@@ -28,7 +28,7 @@ export async function getRegisterSuratListAction({
   try {
     let query = supabase
       .from('documents')
-      .select('*', { count: 'exact' })
+      .select('id, pengaduan_id, berkas_id, tahap, nomor_surat, tgl_dokumen, status, created_at', { count: 'exact' })
       .eq('tenant_id', tenantId)
 
     if (docType) {
@@ -50,28 +50,31 @@ export async function getRegisterSuratListAction({
     const pengaduanIds = [...new Set(docs.map((d: any) => d.pengaduan_id).filter(Boolean))] as string[]
     const berkasIds = [...new Set(docs.map((d: any) => d.berkas_id).filter(Boolean))] as string[]
 
+    const [pengaduanResult, berkasResult] = await Promise.all([
+      pengaduanIds.length > 0
+        ? supabase
+            .from('pengaduan')
+            .select('id, pelapor_nama, kronologi, tgl_pengaduan, jenis, satker_dilaporkan, unit_id, pengaduan_terlapor(terlapor(nama, pangkat, jabatan))')
+            .in('id', pengaduanIds)
+        : Promise.resolve({ data: [], error: null }),
+      berkasIds.length > 0
+        ? supabase
+            .from('berkas')
+            .select('id, judul, nomor_berkas')
+            .in('id', berkasIds)
+        : Promise.resolve({ data: [], error: null }),
+    ])
+
+    const { data: pengaduans, error: pErr } = pengaduanResult
+    const { data: berkasList, error: bErr } = berkasResult
+    const pengaduanErr = pErr?.message || null
+    const berkasErr = bErr?.message || null
+
     const pengaduanMap: Record<string, any> = {}
     const berkasMap: Record<string, any> = {}
-    let pengaduanErr: string | null = null
-    let berkasErr: string | null = null
 
-    if (pengaduanIds.length > 0) {
-      const { data: pengaduans, error: pErr } = await supabase
-        .from('pengaduan')
-        .select('id, pelapor_nama, kronologi, tgl_pengaduan, jenis, satker_dilaporkan, unit_id, pengaduan_terlapor(terlapor(nama, pangkat, jabatan))')
-        .in('id', pengaduanIds)
-      pengaduanErr = pErr?.message || null
-      for (const p of (pengaduans || [])) pengaduanMap[p.id] = p
-    }
-
-    if (berkasIds.length > 0) {
-      const { data: berkasList, error: bErr } = await supabase
-        .from('berkas')
-        .select('id, judul, nomor_berkas')
-        .in('id', berkasIds)
-      berkasErr = bErr?.message || null
-      for (const b of (berkasList || [])) berkasMap[b.id] = b
-    }
+    for (const p of (pengaduans || [])) pengaduanMap[p.id] = p
+    for (const b of (berkasList || [])) berkasMap[b.id] = b
 
     const enriched = docs.map((doc: any) => ({
       ...doc,

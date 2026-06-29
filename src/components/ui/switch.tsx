@@ -1,39 +1,37 @@
 "use client"
 
 import * as React from "react"
+import { Switch as SwitchPrimitive } from "@base-ui/react/switch"
 import { cn } from "@/lib/utils"
 
-interface SwitchProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
-  size?: 'default' | 'sm'
-}
-
-function Switch({ className, size = 'default', ...props }: SwitchProps) {
+function Switch({
+  className,
+  onChange,
+  ...props
+}: Omit<SwitchPrimitive.Root.Props, "onCheckedChange"> & {
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
+}) {
   return (
-    <label
+    <SwitchPrimitive.Root
+      data-slot="switch"
       className={cn(
-        "relative inline-flex items-center cursor-pointer",
-        size === 'sm' ? 'h-4 w-8' : 'h-5 w-9',
+        "peer inline-flex h-[1.15rem] w-7 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2 data-checked:bg-foreground data-disabled:cursor-not-allowed data-disabled:opacity-50 bg-input",
         className
       )}
+      onCheckedChange={(checked) => {
+        if (onChange) {
+          onChange({ target: { checked } } as React.ChangeEvent<HTMLInputElement>)
+        }
+      }}
+      {...props}
     >
-      <input
-        type="checkbox"
-        className="sr-only peer"
-        {...props}
-      />
-      <span
+      <SwitchPrimitive.Thumb
         className={cn(
-          "w-full h-full bg-muted rounded-full border border-input",
-          "peer-checked:bg-primary",
-          "after:content-[''] after:absolute after:top-[2px] after:start-[2px]",
-          "after:bg-background after:rounded-full after:transition-all",
-          "peer-checked:after:translate-x-full",
-          size === 'sm' ? 'after:h-3 after:w-3' : 'after:h-4 after:w-4'
+          "pointer-events-none block h-3 w-3 rounded-full bg-background shadow-sm transition-transform data-checked:translate-x-3.5"
         )}
       />
-    </label>
+    </SwitchPrimitive.Root>
   )
 }
 
 export { Switch }
-export type { SwitchProps }

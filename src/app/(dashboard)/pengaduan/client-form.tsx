@@ -35,6 +35,11 @@ export function PengaduanClientForm({
       {
         loading: 'Menyimpan data...',
         success: () => {
+          const isEdit = !!formData.get('editId')
+          if (isEdit) {
+            router.refresh()
+            return 'Data berhasil disimpan!'
+          }
           if (formRef.current) formRef.current.reset()
           window.dispatchEvent(new CustomEvent('clear-pengaduan-fields'))
           router.push('/pengaduan')

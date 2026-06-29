@@ -135,103 +135,77 @@ export async function getTemplateAction(documentTypeKode: string) {
   const supabase = await createClient()
   const tenantId = await requireTenant()
 
-  let docTypeData = { kode: documentTypeKode, nama: documentTypeKode }
-  try {
-    const { data } = await supabase
+  const [docTypeResult, effectiveTemplate, variableDefs, masterTemplate, masterTemplateRaw] = await Promise.allSettled([
+    supabase
       .from('document_types')
       .select('id, kode, nama')
       .eq('tenant_id', tenantId)
       .eq('kode', documentTypeKode)
-      .single()
-    if (data) docTypeData = { kode: data.kode, nama: data.nama }
-  } catch {
-    // fallback
-  }
-
-  let template: EffectiveTemplate | null = null
-  try {
-    template = await getEffectiveTemplate(documentTypeKode)
-  } catch (err) {
-    console.error('[getTemplateAction] getEffectiveTemplate error:', err)
-  }
-
-  let variableDefs: VariableDef[] = []
-  try {
-    variableDefs = await getVariableDefsWithFallback(documentTypeKode)
-  } catch (err) {
-    console.error('[getTemplateAction] getVariableDefs error:', err)
-  }
-
-  let masterTemplate = null
-  try {
-    masterTemplate = await getMasterTemplate(documentTypeKode)
-  } catch (err) {
-    console.error('[getTemplateAction] getMasterTemplate error:', err)
-  }
-
-  let docTypeExists = false
-  try {
-    const { data } = await supabase
-      .from('document_types')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('kode', documentTypeKode)
-      .single()
-    docTypeExists = !!data
-  } catch {
-    docTypeExists = false
-  }
-
-  let tenantTemplateRaw: any = null
-  try {
-    const { data: docType } = await supabase
-      .from('document_types')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('kode', documentTypeKode)
-      .single()
-    if (docType) {
-      const { data: tpl } = await supabase
-        .from('templates')
-        .select('id, content')
-        .eq('document_type_id', docType.id)
-        .maybeSingle()
-      tenantTemplateRaw = tpl
-    }
-  } catch {
-    tenantTemplateRaw = null
-  }
-
-  let masterTemplateRaw: any = null
-  try {
-    const { data: mt } = await supabase
+      .single(),
+    getEffectiveTemplate(documentTypeKode),
+    getVariableDefsWithFallback(documentTypeKode),
+    getMasterTemplate(documentTypeKode),
+    supabase
       .from('master_templates')
       .select('id, document_type_kode, content')
       .eq('document_type_kode', documentTypeKode)
-      .maybeSingle()
-    masterTemplateRaw = mt
-  } catch {
-    masterTemplateRaw = null
+      .maybeSingle(),
+  ])
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let docTypeData: any = { kode: documentTypeKode, nama: documentTypeKode }
+  let docTypeExists = false
+  let docTypeId: string | null = null
+
+  if (docTypeResult.status === 'fulfilled' && docTypeResult.value.data) {
+    docTypeData = { kode: docTypeResult.value.data.kode, nama: docTypeResult.value.data.nama }
+    docTypeExists = true
+    docTypeId = docTypeResult.value.data.id
   }
+
+  const template: EffectiveTemplate | null = effectiveTemplate.status === 'fulfilled' ? effectiveTemplate.value : null
+  const variableDefsResult: VariableDef[] = variableDefs.status === 'fulfilled' ? variableDefs.value : []
+  const masterTemplateResult = masterTemplate.status === 'fulfilled' ? masterTemplate.value : null
+
+  if (effectiveTemplate.status === 'rejected') console.error('[getTemplateAction] getEffectiveTemplate error:', effectiveTemplate.reason)
+  if (variableDefs.status === 'rejected') console.error('[getTemplateAction] getVariableDefs error:', variableDefs.reason)
+  if (masterTemplate.status === 'rejected') console.error('[getTemplateAction] getMasterTemplate error:', masterTemplate.reason)
+
+  // tenantTemplateRaw depends on docTypeId from first query
+  let tenantTemplateRaw: any = null
+  if (docTypeId) {
+    try {
+      const { data: tpl } = await supabase
+        .from('templates')
+        .select('id, content')
+        .eq('document_type_id', docTypeId)
+        .maybeSingle()
+      tenantTemplateRaw = tpl
+    } catch {
+      // fallback
+    }
+  }
+
+  const masterRaw = masterTemplateRaw.status === 'fulfilled' ? masterTemplateRaw.value.data : null
 
   return {
     template: (template?.content || template?.template_docx_path) ? template : null,
     docType: docTypeData,
-    variableDefs,
-    masterTemplate,
+    variableDefs: variableDefsResult,
+    masterTemplate: masterTemplateResult,
     source: template?.source || 'master',
     debug: {
       hasTenantTemplate: template !== null && template.source === 'tenant',
-      hasMasterTemplate: masterTemplate !== null && !!masterTemplate.content,
-      masterContentLength: masterTemplate?.content?.length || 0,
+      hasMasterTemplate: masterTemplateResult !== null && !!masterTemplateResult.content,
+      masterContentLength: masterTemplateResult?.content?.length || 0,
       effectiveContentLength: template?.content?.length || 0,
       queriedKode: documentTypeKode,
       docTypeExists,
       tenantTemplateContentLen: tenantTemplateRaw?.content?.length || 0,
       tenantTemplateId: tenantTemplateRaw?.id || null,
-      masterTemplateRawId: masterTemplateRaw?.id || null,
-      masterTemplateRawKode: masterTemplateRaw?.document_type_kode || null,
-      masterTemplateRawContentLen: masterTemplateRaw?.content?.length || 0,
+      masterTemplateRawId: masterRaw?.id || null,
+      masterTemplateRawKode: masterRaw?.document_type_kode || null,
+      masterTemplateRawContentLen: masterRaw?.content?.length || 0,
     },
   }
 }
@@ -300,4 +274,61 @@ export async function saveMasterTemplateAction(
   data: { content?: string; header_html?: string; footer_html?: string; template_docx_path?: string | null },
 ) {
   return saveMasterTemplate(kode, data)
+}
+
+// =============== Stempel / Signet Actions ===============
+
+export async function uploadStempelAction(formData: FormData) {
+  const supabase = await createClient()
+  const tenantId = await requireTenant()
+
+  const file = formData.get('file') as File | null
+  if (!file) return { error: 'File tidak ditemukan' }
+
+  if (!file.type.startsWith('image/')) {
+    return { error: 'File harus berupa gambar (PNG, JPG)' }
+  }
+
+  const storagePath = `${tenantId}/stempel.png`
+  const arrayBuffer = await file.arrayBuffer()
+  const buffer = Buffer.from(arrayBuffer)
+
+  const { error } = await supabase.storage
+    .from('templates')
+    .upload(storagePath, buffer, {
+      contentType: file.type,
+      upsert: true,
+    })
+
+  if (error) return { error: 'Gagal mengunggah stempel: ' + error.message }
+
+  return { success: true, path: storagePath }
+}
+
+export async function getStempelUrlAction() {
+  const supabase = await createClient()
+  const tenantId = await requireTenant()
+
+  const storagePath = `${tenantId}/stempel.png`
+
+  const { data } = await supabase.storage
+    .from('templates')
+    .createSignedUrl(storagePath, 3600)
+
+  return { url: data?.signedUrl || null }
+}
+
+export async function removeStempelAction() {
+  const supabase = await createClient()
+  const tenantId = await requireTenant()
+
+  const storagePath = `${tenantId}/stempel.png`
+
+  const { error } = await supabase.storage
+    .from('templates')
+    .remove([storagePath])
+
+  if (error) return { error: 'Gagal menghapus stempel: ' + error.message }
+
+  return { success: true }
 }

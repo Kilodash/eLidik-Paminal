@@ -1,3 +1,3 @@
-export * from './registry'
-export * from './types'
-export * from './renderer'
+export * from "./types"
+export * from "./registry"
+export * from "./renderer"

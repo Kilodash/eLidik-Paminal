@@ -3,7 +3,14 @@
 import { createPengaduan, updatePengaduan, deletePengaduan, mergePengaduanToBerkas, splitPengaduanFromBerkas } from '@/lib/data/pengaduan'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireTenant } from '@/lib/auth'
+import { requireTenant, requireRole } from '@/lib/auth'
+import { syncGajamadaIntake } from '@/lib/gajamada/sync'
+import { enrichGajamadaPengaduan, enrichSinglePengaduan } from '@/lib/gajamada/enrich'
+
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return String(err)
+}
 
 export async function savePengaduan(formData: FormData) {
   try {
@@ -14,12 +21,28 @@ export async function savePengaduan(formData: FormData) {
       return { error: 'Jenis Dumas wajib dipilih / diubah dari default (--)' }
     }
 
+    // Resolve klasifikasi_nama → klasifikasi_id (UUID)
+    let klasifikasiId: string | null = null
+    const klasifikasiNama = (formData.get('klasifikasi_nama') as string) || null
+    if (klasifikasiNama) {
+      const supabase = await createClient()
+      const tenantId = await requireTenant()
+      const { data: kat } = await supabase
+        .from('klasifikasi')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('nama', klasifikasiNama)
+        .maybeSingle()
+      klasifikasiId = kat?.id || null
+    }
+
     const dataPayload = {
       jenis: jenisValue,
       tgl_pengaduan: formData.get('tgl_pengaduan') as string,
       pelapor_nama: (formData.get('pelapor_nama') as string) || null,
       terlapor_nama: (formData.get('terlapor_nama') as string) || undefined,
       satker_dilaporkan: (formData.get('satker_dilaporkan') as string) || null,
+      klasifikasi_id: klasifikasiId,
       tgl_surat: (formData.get('tgl_surat') as string) || null,
       nomor_surat: (formData.get('nomor_surat') as string) || null,
       keterangan: (formData.get('keterangan') as string) || null,
@@ -142,35 +165,39 @@ export async function submitPerdamaianAction(pengaduanId: string, formData: Form
     const supabase = await createClient()
     const tenantId = await requireTenant()
     
-    // 1. Simpan form ke tabel perdamaian
-    const { error: damaiError } = await supabase.from('perdamaian').insert({
-      tenant_id: tenantId,
-      pengaduan_id: pengaduanId,
-      tgl_perdamaian: formData.get('tgl_perdamaian') as string,
-      pihak_hadir: formData.get('pihak_hadir') as string,
-      kronologi: formData.get('kronologi') as string,
-      tahap_saat_damai: formData.get('tahap_saat_damai') as string,
-    })
-    if (damaiError) throw damaiError
+    // 1. Simpan form ke tabel perdamaian + update status + ambil user & berkas (parallel)
+    const [
+      { error: damaiError },
+      { error: updateError },
+      { data: { user } },
+      { data: pengaduanData },
+    ] = await Promise.all([
+      supabase.from('perdamaian').insert({
+        tenant_id: tenantId,
+        pengaduan_id: pengaduanId,
+        tgl_perdamaian: formData.get('tgl_perdamaian') as string,
+        pihak_hadir: formData.get('pihak_hadir') as string,
+        kronologi: formData.get('kronologi') as string,
+        tahap_saat_damai: formData.get('tahap_saat_damai') as string,
+      }),
+      supabase
+        .from('pengaduan')
+        .update({ status: 'perdamaian' })
+        .eq('id', pengaduanId)
+        .eq('tenant_id', tenantId),
+      supabase.auth.getUser(),
+      supabase
+        .from('pengaduan')
+        .select('berkas_id')
+        .eq('id', pengaduanId)
+        .eq('tenant_id', tenantId)
+        .single(),
+    ])
 
-    // 2. Update status pengaduan jadi perdamaian
-    const { error: updateError } = await supabase
-      .from('pengaduan')
-      .update({ status: 'perdamaian' })
-      .eq('id', pengaduanId)
-      .eq('tenant_id', tenantId)
+    if (damaiError) throw damaiError
     if (updateError) throw updateError
 
-    // 3. Auto-generate dokumen terpilih di database
-    const { data: { user } } = await supabase.auth.getUser()
     const userId = user?.id || null
-
-    const { data: pengaduanData } = await supabase
-      .from('pengaduan')
-      .select('berkas_id')
-      .eq('id', pengaduanId)
-      .eq('tenant_id', tenantId)
-      .single()
     const berkasId = pengaduanData?.berkas_id || null
 
     const docTindakLanjutRaw = formData.get('tindak_lanjut_docs') as string | null
@@ -195,6 +222,95 @@ export async function submitPerdamaianAction(pengaduanId: string, formData: Form
   }
 }
 
+// Shared helper: batch generate multiple documents at once (avoids N+1 loop)
+async function batchGenerateDocuments(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  tenantId: string,
+  userId: string | null,
+  pengaduanId: string,
+  berkasId: string | null,
+  docs: { kode: string; nama: string; tahap: string }[],
+) {
+  if (docs.length === 0) return
+
+  const kodes = docs.map(d => d.kode)
+
+  const { data: existingDocTypes } = await supabase
+    .from('document_types')
+    .select('id, kode')
+    .eq('tenant_id', tenantId)
+    .in('kode', kodes)
+
+  const docTypeMap = new Map<string, string>()
+  for (const dt of (existingDocTypes || [])) {
+    docTypeMap.set(dt.kode, dt.id)
+  }
+
+  const missingDocs = docs.filter(d => !docTypeMap.has(d.kode))
+  if (missingDocs.length > 0) {
+    const { data: newTypes } = await supabase
+      .from('document_types')
+      .insert(missingDocs.map(d => ({ tenant_id: tenantId, kode: d.kode, nama: d.nama, tahap: d.tahap, is_active: true })))
+      .select('id, kode')
+    for (const nt of (newTypes || [])) {
+      docTypeMap.set(nt.kode, nt.id)
+    }
+  }
+
+  const docTypeIds = docs.map(d => docTypeMap.get(d.kode)).filter(Boolean) as string[]
+  const templateMap = new Map<string, string>()
+  if (docTypeIds.length > 0) {
+    const { data: templates } = await supabase
+      .from('templates')
+      .select('id, document_type_id')
+      .in('document_type_id', docTypeIds)
+    for (const t of (templates || [])) {
+      templateMap.set(t.document_type_id, t.id)
+    }
+  }
+
+  const { data: existingDocs } = await supabase
+    .from('documents')
+    .select('content_rendered')
+    .eq('pengaduan_id', pengaduanId)
+
+  const existingKodes = new Set<string>()
+  for (const ed of (existingDocs || [])) {
+    for (const doc of docs) {
+      if ((ed.content_rendered || '').includes(doc.nama)) {
+        existingKodes.add(doc.kode)
+        break
+      }
+    }
+  }
+
+  const year = new Date().getFullYear()
+  const tglNow = new Date().toISOString().split('T')[0]
+  const insertRows = docs
+    .filter(d => !existingKodes.has(d.kode))
+    .map(d => {
+      const docTypeId = docTypeMap.get(d.kode) || null
+      const templateId = docTypeId ? templateMap.get(docTypeId) || null : null
+      return {
+        tenant_id: tenantId,
+        template_id: templateId,
+        pengaduan_id: pengaduanId,
+        berkas_id: berkasId,
+        tahap: d.tahap,
+        nomor_surat: `AUTO/${d.kode}/${year}`,
+        tgl_dokumen: tglNow,
+        content_rendered: `<div style="font-family: sans-serif; padding: 20px;"><h2 style="text-align: center;">${d.nama.toUpperCase()}</h2><p style="text-align: center;">Nomor: AUTO/${d.kode}/${year}</p><hr/><p>Dokumen ini telah digenerate secara otomatis melalui mekanisme perdamaian dumas.</p><p>Tanggal Dokumen: ${new Date().toLocaleDateString('id-ID')}</p></div>`,
+        status: 'draft',
+        created_by: userId,
+      }
+    })
+
+  if (insertRows.length > 0) {
+    await supabase.from('documents').insert(insertRows)
+  }
+}
+
 // Helper function to auto generate selected documents as draft
 async function autoGeneratePerdamaianDocuments(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -207,7 +323,7 @@ async function autoGeneratePerdamaianDocuments(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tindakLanjutDocs: any
 ) {
-  const documentsToGenerate = []
+  const documentsToGenerate: { kode: string; nama: string; tahap: string }[] = []
 
   if (tahapSaatDamai === 'Perdamaian Sebelum Penyelidikan') {
     if (tindakLanjutDocs.ba_pemeriksaan_tambahan) {
@@ -217,7 +333,6 @@ async function autoGeneratePerdamaianDocuments(
       documentsToGenerate.push({ kode: 'ND-SARAN-HENTI', nama: 'Nota Dinas Saran Penghentian Penanganan Dumas', tahap: 'Penutupan' })
     }
   } else {
-    // Setelah Penyelidikan
     if (tindakLanjutDocs.nd_gelar) {
       documentsToGenerate.push({ kode: 'ND-GELAR', nama: 'permohonan gelar perkara/penyelidikan', tahap: 'Gelar' })
     }
@@ -232,90 +347,7 @@ async function autoGeneratePerdamaianDocuments(
     }
   }
 
-  for (const doc of documentsToGenerate) {
-    // Check if duplicate document already exists to prevent duplicates
-    const { data: existing } = await supabase
-      .from('documents')
-      .select('id')
-      .eq('pengaduan_id', pengaduanId)
-      .eq('tahap', doc.tahap)
-      .ilike('content_rendered', `%${doc.nama}%`)
-      .limit(1)
-
-    if (existing && existing.length > 0) {
-      continue
-    }
-
-    // Get or create document type record to match the system's schema
-    let docTypeId = null
-    const { data: docType } = await supabase
-      .from('document_types')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('kode', doc.kode)
-      .limit(1)
-      .single()
-
-    if (docType) {
-      docTypeId = docType.id
-    } else {
-      const { data: newType } = await supabase
-        .from('document_types')
-        .insert({
-          tenant_id: tenantId,
-          kode: doc.kode,
-          nama: doc.nama,
-          tahap: doc.tahap,
-          is_active: true
-        })
-        .select('id')
-        .limit(1)
-        .single()
-      if (newType) {
-        docTypeId = newType.id
-      }
-    }
-
-    // Try to find a template for this document type
-    let templateId = null
-    if (docTypeId) {
-      const { data: template } = await supabase
-        .from('templates')
-        .select('id')
-        .eq('document_type_id', docTypeId)
-        .limit(1)
-        .single()
-      if (template) {
-        templateId = template.id
-      }
-    }
-
-    // Format default placeholder content
-    const year = new Date().getFullYear()
-    const nomorSurat = `AUTO/${doc.kode}/${year}`
-    const htmlContent = `
-      <div style="font-family: sans-serif; padding: 20px;">
-        <h2 style="text-align: center;">${doc.nama.toUpperCase()}</h2>
-        <p style="text-align: center;">Nomor: ${nomorSurat}</p>
-        <hr/>
-        <p>Dokumen ini telah digenerate secara otomatis melalui mekanisme perdamaian dumas.</p>
-        <p>Tanggal Dokumen: ${new Date().toLocaleDateString('id-ID')}</p>
-      </div>
-    `
-
-    await supabase.from('documents').insert({
-      tenant_id: tenantId,
-      template_id: templateId,
-      pengaduan_id: pengaduanId,
-      berkas_id: berkasId,
-      tahap: doc.tahap,
-      nomor_surat: nomorSurat,
-      tgl_dokumen: new Date().toISOString().split('T')[0],
-      content_rendered: htmlContent,
-      status: 'draft',
-      created_by: userId
-    })
-  }
+  await batchGenerateDocuments(supabase, tenantId, userId, pengaduanId, berkasId, documentsToGenerate)
 }
 
 // Action to generate a single document and associate it with a complaint/berkas
@@ -323,12 +355,10 @@ export async function generateSingleDocumentAction(pengaduanId: string, docKode:
   try {
     const supabase = await createClient()
     const tenantId = await requireTenant()
-    
-    // Get user info
+
     const { data: { user } } = await supabase.auth.getUser()
     const userId = user?.id || null
 
-    // Get berkas_id from pengaduan
     const { data: pengaduanData } = await supabase
       .from('pengaduan')
       .select('berkas_id')
@@ -337,92 +367,9 @@ export async function generateSingleDocumentAction(pengaduanId: string, docKode:
       .single()
     const berkasId = pengaduanData?.berkas_id || null
 
-    // Check if duplicate document already exists to prevent duplicates
-    const { data: existing } = await supabase
-      .from('documents')
-      .select('id')
-      .eq('pengaduan_id', pengaduanId)
-      .ilike('content_rendered', `%${docNama}%`)
-      .limit(1)
-
-    if (existing && existing.length > 0) {
-      return { success: true, message: `Dokumen ${docNama} sudah pernah dibuat.` }
-    }
-
-    const tahap = subKategori || 'Perdamaian'
-
-    // Get or create document type record
-    let docTypeId = null
-    const { data: docType } = await supabase
-      .from('document_types')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('kode', docKode)
-      .limit(1)
-      .single()
-
-    if (docType) {
-      docTypeId = docType.id
-    } else {
-      const { data: newType } = await supabase
-        .from('document_types')
-        .insert({
-          tenant_id: tenantId,
-          kode: docKode,
-          nama: docNama,
-          tahap,
-          is_active: true
-        })
-        .select('id')
-        .limit(1)
-        .single()
-      if (newType) {
-        docTypeId = newType.id
-      }
-    }
-
-    // Try to find a template for this document type
-    let templateId = null
-    if (docTypeId) {
-      const { data: template } = await supabase
-        .from('templates')
-        .select('id')
-        .eq('document_type_id', docTypeId)
-        .limit(1)
-        .single()
-      if (template) {
-        templateId = template.id
-      }
-    }
-
-    // Format default placeholder content
-    const year = new Date().getFullYear()
-    const nomorSurat = `AUTO/${docKode}/${year}`
-    const htmlContent = `
-      <div style="font-family: sans-serif; padding: 20px;">
-        <h2 style="text-align: center;">${docNama.toUpperCase()}</h2>
-        <p style="text-align: center;">Nomor: ${nomorSurat}</p>
-        ${metadata ? `<p>Metadata: ${metadata}</p>` : ''}
-        <hr/>
-        <p>Dokumen ini telah digenerate secara otomatis melalui mekanisme ${tahap.toLowerCase()} dumas.</p>
-        <p>Tanggal Dokumen: ${new Date().toLocaleDateString('id-ID')}</p>
-      </div>
-    `
-
-    const { error: insertError } = await supabase.from('documents').insert({
-      tenant_id: tenantId,
-      template_id: templateId,
-      pengaduan_id: pengaduanId,
-      berkas_id: berkasId,
-      tahap,
-      nomor_surat: nomorSurat,
-      tgl_dokumen: new Date().toISOString().split('T')[0],
-      content_rendered: htmlContent,
-      status: 'draft',
-      created_by: userId
-    })
-
-    if (insertError) throw insertError
+    await batchGenerateDocuments(supabase, tenantId, userId, pengaduanId, berkasId, [
+      { kode: docKode, nama: docNama, tahap: 'Perdamaian' },
+    ])
 
     revalidatePath('/pengaduan')
     return { success: true, message: `Dokumen "${docNama}" berhasil dibuat otomatis sebagai draf di database!` }
@@ -481,15 +428,17 @@ export async function updateDistribusiAction(pengaduanId: string, unitId: string
     const supabase = await createClient()
     const tenantId = await requireTenant()
 
-    const { data: { user } } = await supabase.auth.getUser()
-    const userId = user?.id
+    const [{ data: { user } }, { data: currentPengaduan }] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase
+        .from('pengaduan')
+        .select('status, unit_id')
+        .eq('id', pengaduanId)
+        .eq('tenant_id', tenantId)
+        .single(),
+    ])
 
-    const { data: currentPengaduan } = await supabase
-      .from('pengaduan')
-      .select('status, unit_id')
-      .eq('id', pengaduanId)
-      .eq('tenant_id', tenantId)
-      .single()
+    const userId = user?.id
 
     const { error: updateError } = await supabase
       .from('pengaduan')
@@ -521,232 +470,105 @@ export async function updateDistribusiAction(pengaduanId: string, unitId: string
 }
 
 
-export async function checkUnsavedPropamDataAction() {
+export async function syncGajamadaIntakeAction() {
+  try {
+    const personel = await requireRole('admin_subbid', 'oversight')
+    if (!personel) return { error: 'Akses ditolak' }
+
+    const tenantId = await requireTenant()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const createdBy = (personel as any).id as string
+
+    const result = await syncGajamadaIntake({ tenantId, createdBy })
+
+    if (!result.success) return { error: result.error }
+
+    revalidatePath('/pengaduan')
+    return { success: true, count: result.count, skipped: result.skipped }
+  } catch (error: unknown) {
+    console.error('Error syncing Gajamada intake:', error)
+    return { error: getErrorMessage(error) || 'Gagal sinkron Gajamada' }
+  }
+}
+
+export async function enrichGajamadaAction(maxItems?: number, orderBy?: string, orderDir?: string) {
+  try {
+    await requireRole('admin_subbid', 'oversight')
+    const tenantId = await requireTenant()
+
+    const result = await enrichGajamadaPengaduan({ tenantId, maxItems, orderBy, orderDir })
+
+    if (!result.success) return { error: result.error }
+
+    revalidatePath('/pengaduan')
+    return { success: true, processed: result.processed, errors: result.errors, remaining: result.remaining }
+  } catch (error: unknown) {
+    console.error('Error enriching Gajamada:', error)
+    return { error: getErrorMessage(error) || 'Gagal enrichment AI' }
+  }
+}
+
+export async function resetGajamadaAIAction(pengaduanId: string) {
+  try {
+    await requireRole('admin_subbid', 'oversight')
+    const tenantId = await requireTenant()
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('pengaduan')
+      .update({ ai_processed: false })
+      .eq('id', pengaduanId)
+      .eq('tenant_id', tenantId)
+
+    if (error) throw error
+
+    revalidatePath('/pengaduan')
+    return { success: true }
+  } catch (error: unknown) {
+    console.error('Error resetting AI:', error)
+    return { error: getErrorMessage(error) || 'Gagal reset AI' }
+  }
+}
+
+export async function getGajamadaProgressAction() {
   try {
     const supabase = await createClient()
     const tenantId = await requireTenant()
-    
-    const { data: { user } } = await supabase.auth.getUser()
-    const userId = user?.id
 
-    if (!userId) {
-      throw new Error("Unauthorized")
-    }
-
-    const url = "https://gajamada-propam.polri.go.id/api/v1/apps/data/management/get-all"
-    const headers = {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "Origin": "https://gajamada-propam.polri.go.id",
-      "Referer": "https://gajamada-propam.polri.go.id/",
-      // Cookie hardcoded sementara untuk testing. Nanti pindahkan ke .env
-      "Cookie": "token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiYTA3NjExYjE3ZjA2M2Y4YjU0NjBmMmVhYTVjN2RlZGEiLCJvcmdhbml6YXRpb25faWQiOiIiLCJwZXJtaXNzaW9uX2lkIjoiMmRkMmM4ZjZkZjdlZjdiMDllYzQ1NzRiNjliNjg1OTEiLCJtdWx0aUxvZ2luIjp0cnVlLCJleHBpcmUiOjE3ODI1MDgwMjYuNDUzODY4NCwidHlwZSI6ImFjY2VzcyJ9.q1olEk30rmoe8681UP7HyyZl0aP47CjFmAHLD0TmjLA; refresh_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiYTA3NjExYjE3ZjA2M2Y4YjU0NjBmMmVhYTVjN2RlZGEiLCJvcmdhbml6YXRpb25faWQiOiIiLCJwZXJtaXNzaW9uX2lkIjoiMmRkMmM4ZjZkZjdlZjdiMDllYzQ1NzRiNjliNjg1OTEiLCJtdWx0aUxvZ2luIjp0cnVlLCJleHBpcmUiOjE3ODMwNjk2MjYuNDUzOTc3MywidHlwZSI6InJlZnJlc2gifQ.BOJSdGtDsJVF3UJrD0ffnsPohIhx3If1ck46Co1MCbE"
-    }
-    // Fetch halaman pertama untuk dapat info total halaman
-    const firstPayload = {
-      "connectionId": "245b8fd7c4a763019d5172fad5ec0086",
-      "database": "divpropam",
-      "filters": [],
-      "metaData": {
-        "widgetId": "8533ca87b75e04b1f39d19d98dabc0ef",
-        "menuId": "ce64015a07578d9195a0e589de1108c8"
-      },
-      "order": "desc",
-      "orderBy": "created_date",
-      "page": 1,
-      "size": 1000,
-      "table": "gold.report"
-    }
-
-    const firstResponse = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(firstPayload)
-    })
-
-    if (!firstResponse.ok) {
-      throw new Error(`Gagal fetch GAJAMADA: ${firstResponse.statusText}`)
-    }
-
-    const firstResult = await firstResponse.json()
-    const firstPageItems = firstResult.data || firstResult.detail?.data || []
-    const pagination = (firstResult.metaData || firstResult.detail?.metaData || {}).pagination || {}
-    const totalPages = pagination.totalPages || 1
-
-    // Filter hasil halaman pertama
-    const allFilteredItems: any[] = firstPageItems.filter((item: any) => {
-      const disposisi = (item.disposisi_case_position || '').toUpperCase()
-      return disposisi.includes('KASUBBID PAMINAL') && (disposisi.includes('JABAR') || disposisi.includes('JAWA BARAT'))
-    })
-
-    // Fetch sisa halaman secara paralel
-    if (totalPages > 1) {
-      const remainingPages = []
-      for (let p = 2; p <= Math.min(totalPages, 30); p++) {
-        remainingPages.push(
-          fetch(url, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ ...firstPayload, page: p })
-          }).then(r => r.json())
-        )
-      }
-
-      const results = await Promise.all(remainingPages)
-
-      for (const result of results) {
-        const items = result.data || result.detail?.data || []
-        if (!items || items.length === 0) continue
-
-        for (const item of items) {
-          const disposisi = (item.disposisi_case_position || '').toUpperCase()
-          if (disposisi.includes('KASUBBID PAMINAL') && (disposisi.includes('JABAR') || disposisi.includes('JAWA BARAT'))) {
-            allFilteredItems.push(item)
-          }
-        }
-      }
-    }
-
-    // Deduplikasi by ID
-    const seenIds = new Set<string>()
-    const uniqueItems: any[] = []
-    for (const item of allFilteredItems) {
-      if (!seenIds.has(item.id)) {
-        seenIds.add(item.id)
-        uniqueItems.push(item)
-      }
-    }
-
-    const itemsWithStatus: any[] = []
-
-    for (const item of uniqueItems) {
-      const { data: existing } = await supabase
+    const [{ count: total }, { count: processed }] = await Promise.all([
+      supabase
         .from('pengaduan')
-        .select('id')
+        .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
-        .neq('status', 'dibatalkan')
-        .ilike('kronologi', `%${(item.summary || item.content || '').substring(0, 50)}%`)
-        .limit(1)
+        .not('gajamada_id', 'is', null),
+      supabase
+        .from('pengaduan')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .not('gajamada_id', 'is', null)
+        .eq('ai_processed', true),
+    ])
 
-      itemsWithStatus.push({
-        ...item,
-        alreadySaved: !!(existing && existing.length > 0)
-      })
-    }
-
-    return { success: true, data: itemsWithStatus }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (error: any) {
-    console.error('Error checking GAJAMADA data:', error)
-    return { error: error.message || 'Gagal mengecek data GAJAMADA' }
+    return { total: total || 0, processed: processed || 0 }
+  } catch (error: unknown) {
+    console.error('Error getting Gajamada progress:', error)
+    return { total: 0, processed: 0 }
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function saveSinglePropamDataAction(item: any) {
+export async function enrichSinglePengaduanAction(pengaduanId: string) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const userId = user?.id
+    await requireRole('admin_subbid', 'oversight')
+    const tenantId = await requireTenant()
 
-    if (!userId) {
-      throw new Error("Unauthorized")
-    }
+    const result = await enrichSinglePengaduan({ tenantId, pengaduanId })
 
-    const statusMap: Record<string, string> = {
-      'Laporan Diterima Kasubbid Paminal': 'diterima',
-      'Laporan Masuk': 'proses',
-      'Terbukti': 'terbukti',
-      'Tidak Terbukti': 'tidak_terbukti',
-      'Laporan Selesai Restorative Justice': 'perdamaian',
-    }
+    if (!result.success) return { error: result.error }
 
-    const statusLabel = item.status_label || ''
-    const mappedStatus = statusMap[statusLabel] || 'diterima'
-
-    const dataPayload = {
-      jenis: "Pengaduan Cepat Propam",
-      tgl_pengaduan: new Date(item.created_date).toISOString().split('T')[0],
-      tgl_surat: new Date(item.created_date).toISOString().split('T')[0],
-      nomor_surat: item.id || '',
-      pelapor_nama: item.pengirim || "Hamba Allah",
-      terlapor_nama: item.prepetrator_name || "Tidak Diketahui",
-      satker_dilaporkan: item.disposisi_polda || "POLDA JAWA BARAT",
-      keterangan: '',
-      kronologi: item.summary || '',
-      status: mappedStatus,
-      atensi: true,
-      created_by: userId,
-    }
-
-    await createPengaduan(dataPayload)
     revalidatePath('/pengaduan')
-
     return { success: true }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (error: any) {
-    console.error('Error saving data GAJAMADA:', error)
-    return { error: error.message || 'Gagal menyimpan data pengaduan GAJAMADA' }
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function bulkSavePropamDataAction(items: any[]) {
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const userId = user?.id
-
-    if (!userId) {
-      throw new Error("Unauthorized")
-    }
-
-    const statusMap: Record<string, string> = {
-      'Laporan Diterima Kasubbid Paminal': 'diterima',
-      'Laporan Masuk': 'proses',
-      'Terbukti': 'terbukti',
-      'Tidak Terbukti': 'tidak_terbukti',
-      'Laporan Selesai Restorative Justice': 'perdamaian',
-    }
-
-    let imported = 0
-    let skipped = 0
-
-    for (const item of items) {
-      const statusLabel = item.status_label || ''
-      const mappedStatus = statusMap[statusLabel] || 'diterima'
-
-      const dataPayload = {
-        jenis: "Pengaduan Cepat Propam",
-        tgl_pengaduan: new Date(item.created_date).toISOString().split('T')[0],
-        tgl_surat: new Date(item.created_date).toISOString().split('T')[0],
-        nomor_surat: item.id || '',
-        pelapor_nama: item.pengirim || "Hamba Allah",
-        terlapor_nama: item.prepetrator_name || "Tidak Diketahui",
-        satker_dilaporkan: item.disposisi_polda || "POLDA JAWA BARAT",
-        keterangan: '',
-        kronologi: item.summary || '',
-        status: mappedStatus,
-        atensi: true,
-        created_by: userId,
-      }
-
-      try {
-        await createPengaduan(dataPayload)
-        imported++
-      } catch (e) {
-        console.error('Error importing item:', item.id, e)
-        skipped++
-      }
-    }
-
-    revalidatePath('/pengaduan')
-
-    return { success: true, imported, skipped }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (error: any) {
-    console.error('Error bulk saving GAJAMADA data:', error)
-    return { error: error.message || 'Gagal menyimpan data pengaduan GAJAMADA' }
+  } catch (error: unknown) {
+    console.error('Error enriching single pengaduan:', error)
+    return { error: getErrorMessage(error) || 'Gagal enrichment AI' }
   }
 }

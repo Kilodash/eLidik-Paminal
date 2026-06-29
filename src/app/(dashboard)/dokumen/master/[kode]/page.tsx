@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Loader2, Save, Eye, ArrowLeft, Upload, Download, Trash2, FileText } from 'lucide-react'
+import { toast } from 'sonner'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
 import {
   getMasterTemplateAction,
@@ -31,6 +33,7 @@ export default function MasterTemplatePage() {
   const [docxDownloadUrl, setDocxDownloadUrl] = useState<string | null>(null)
   const [uploadingDocx, setUploadingDocx] = useState(false)
   const [removingDocx, setRemovingDocx] = useState(false)
+  const [docxRemoveOpen, setDocxRemoveOpen] = useState(false)
   const [docTypeName, setDocTypeName] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -109,9 +112,9 @@ export default function MasterTemplatePage() {
     })
     setSaving(false)
     if (res.error) {
-      alert('Gagal menyimpan: ' + res.error)
+      toast.error('Gagal menyimpan: ' + res.error)
     } else {
-      alert('Template master berhasil disimpan!')
+      toast.success('Template master berhasil disimpan!')
     }
   }
 
@@ -131,7 +134,7 @@ export default function MasterTemplatePage() {
 
     if (error) {
       setUploadingDocx(false)
-      alert('Gagal mengunggah: ' + error.message)
+      toast.error('Gagal mengunggah: ' + error.message)
       return
     }
 
@@ -145,7 +148,7 @@ export default function MasterTemplatePage() {
 
     if (convRes.error || !convRes.html) {
       setUploadingDocx(false)
-      alert('Gagal konversi DOCX: ' + (convRes.error || 'hasil kosong'))
+      toast.error('Gagal konversi DOCX: ' + (convRes.error || 'hasil kosong'))
       return
     }
 
@@ -162,15 +165,14 @@ export default function MasterTemplatePage() {
     setUploadingDocx(false)
 
     if (saveRes.error) {
-      alert('Gagal menyimpan template: ' + saveRes.error)
+      toast.error('Gagal menyimpan template: ' + saveRes.error)
     } else {
-      alert('Template DOCX berhasil diunggah, dikonversi, dan disimpan!')
+      toast.success('Template DOCX berhasil diunggah, dikonversi, dan disimpan!')
     }
   }
 
   const handleDocxRemove = async () => {
-    if (!confirm('Hapus template DOCX master?')) return
-
+    setDocxRemoveOpen(false)
     setRemovingDocx(true)
     const supabase = createClient()
 
@@ -181,7 +183,7 @@ export default function MasterTemplatePage() {
     setDocxPath(null)
     setDocxDownloadUrl(null)
     setRemovingDocx(false)
-    alert('Template DOCX dihapus.')
+    toast.success('Template DOCX dihapus.')
   }
 
   const INSERT_VARIABLES = [
@@ -374,7 +376,7 @@ export default function MasterTemplatePage() {
                 )}
 
                 {docxPath && (
-                  <Button variant="ghost" size="sm" className="h-8 gap-1 text-red-600" onClick={handleDocxRemove} disabled={removingDocx}>
+                  <Button variant="ghost" size="sm" className="h-8 gap-1 text-red-600" onClick={() => setDocxRemoveOpen(true)} disabled={removingDocx}>
                     <Trash2 className="h-4 w-4" /> {removingDocx ? 'Menghapus...' : 'Hapus'}
                   </Button>
                 )}
@@ -390,6 +392,16 @@ export default function MasterTemplatePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ConfirmDialog
+        open={docxRemoveOpen}
+        onOpenChange={setDocxRemoveOpen}
+        title="Hapus Template DOCX Master"
+        description="Anda yakin ingin menghapus template DOCX master? Tindakan ini tidak dapat dibatalkan."
+        variant="destructive"
+        confirmLabel="Hapus"
+        onConfirm={handleDocxRemove}
+      />
     </div>
   )
 }

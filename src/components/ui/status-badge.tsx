@@ -30,13 +30,13 @@ const STATUS_LABELS: Record<string, string> = {
   gelar: 'Gelar Perkara',
   terbukti: 'Terbukti',
   tidak_terbukti: 'Tidak Terbukti',
-  closed: 'Closed',
+  closed: 'Tutup',
   perdamaian: 'Perdamaian',
-  open: 'Open',
-  draft: 'Draft',
+  open: 'Buka',
+  draft: 'Konsep',
   final: 'Final',
-  printed: 'Printed',
-  in_progress: 'In Progress',
+  printed: 'Tercetak',
+  in_progress: 'Berjalan',
   selesai: 'Selesai',
 }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useDebouncedCallback } from 'use-debounce'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -149,10 +150,15 @@ export function GenericForm({ pengaduanId, variableDefs, onChange }: GenericForm
     loadDefaults()
   }, [loadDefaults])
 
-  // Emit serialisasi setiap kali state berubah (memicu pratinjau di editor utama).
+  // Emit serialisasi dengan debounce (150ms) agar tidak memicu re-render tiap keystroke
+  const debouncedOnChange = useDebouncedCallback(
+    (serialized: Record<string, string>) => onChange(serialized),
+    150,
+  )
+
   useEffect(() => {
-    if (!loading) onChange(serialize(defs, state))
-  }, [loading, state, defs, onChange])
+    if (!loading) debouncedOnChange(serialize(defs, state))
+  }, [loading, state, defs, debouncedOnChange])
 
   const setField = useCallback((key: string, value: FieldValue) => {
     setState(prev => ({ ...prev, [key]: value }))

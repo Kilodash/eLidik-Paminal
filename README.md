@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# eLidik Paminal
 
-## Getting Started
+Sistem digitalisasi lidik paminal Polri.
 
-First, run the development server:
+## Stack
+- Next.js 16 + React 19 + TypeScript
+- Supabase (Postgres + Auth + Storage + RLS)
+- Ant Design 6 + shadcn/ui + Tailwind 4
+- TipTap (rich editor), docxtemplater/pdf-lib (docx/pdf)
+- Recharts, Zustand
 
+## Setup lokal
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.local.example .env.local   # isi kredensial Supabase
+npm run dev                        # http://localhost:4000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Scripts
+| Command          | Fungsi                                |
+|------------------|---------------------------------------|
+| `npm run dev`    | Dev server (port 4000)                |
+| `npm run build`  | Production build                      |
+| `npm run start`  | Jalankan production build             |
+| `npm run lint`   | ESLint check                          |
+| `npm run format` | Prettier write                        |
+| `npm run check`  | Lint + format check (CI parity)       |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Struktur
+```
+src/          App routes, components, lib, hooks
+supabase/     SQL migrations (urut = urutan eksekusi)
+docs/         SOP, aturan, referensi
+frontend/     Aset frontend tambahan
+scripts/      Utilitas build/seed
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## CI
+- PR/push → lint + typecheck + build
+- `supabase/**` berubah → SQL lint via Supabase CLI
+- Dependabot auto-update mingguan (Senin 08:00 WIB)
 
-## Learn More
+## MCP (opsional)
+Konfigurasi di `.vscode/mcp.json`:
+- `supabase` — query DB, jalankan migrasi
+- `github` — kelola PR/issue
+- `filesystem` — akses `supabase/` & `docs/`
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Butuh env: `SUPABASE_ACCESS_TOKEN`, `GITHUB_TOKEN`.

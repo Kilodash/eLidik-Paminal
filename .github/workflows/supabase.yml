@@ -1,0 +1,22 @@
+name: Supabase
+
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/**']
+  pull_request:
+    paths: ['supabase/**']
+
+jobs:
+  lint:
+    name: SQL Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase db lint
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}

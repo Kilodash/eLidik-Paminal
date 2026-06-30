@@ -1,0 +1,4 @@
+{
+  "*.{js,jsx,ts,tsx,mjs,cjs,json,css,scss,md,mdx,yml,yaml}": ["npx prettier --write"],
+  "*.{js,jsx,ts,tsx,mjs,cjs}": ["npx eslint --fix --quiet"]
+}

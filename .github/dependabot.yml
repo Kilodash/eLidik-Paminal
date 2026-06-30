@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: 08:00
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 10
+    groups:
+      nextjs:
+        patterns: ['next', '@next/*', 'eslint-config-next']
+      supabase:
+        patterns: ['@supabase/*']
+      antd:
+        patterns: ['antd', '@ant-design/*']
+      tiptap:
+        patterns: ['@tiptap/*']
+    labels: [dependencies]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [ci]

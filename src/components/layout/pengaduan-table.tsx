@@ -8,8 +8,7 @@ import { DataTable } from '@/components/ui/data-table'
 import { Search, GitMerge, Trash2, Unlink, RotateCcw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { AlertCircle, Handshake, Info } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { AlertCircle, Handshake } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { formatNameCase } from '@/lib/utils'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -55,6 +54,12 @@ type PengaduanRow = {
   tgl_pengaduan: string | null
   berkas?: { id: string; nomor_berkas: string } | null
   atensi: boolean
+  gajamada_id?: string | null
+  gajamada_status?: string | null
+  gajamada_case_position?: string | null
+  gajamada_unit_tujuan?: string | null
+  gajamada_polda?: string | null
+  unit_id?: string | null
 }
 
 interface Props {
@@ -66,9 +71,10 @@ interface Props {
   userId: string
   sortBy: string
   sortOrder: 'asc' | 'desc'
+  gajamadaStage?: string
 }
 
-export function PengaduanTable({ data, total, page, query = '', userRole, userId, sortBy = 'tgl_pengaduan', sortOrder = 'desc' }: Props) {
+export function PengaduanTable({ data, total, page, query = '', userRole, userId, sortBy = 'tgl_pengaduan', sortOrder = 'desc', gajamadaStage }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [localQuery, setLocalQuery] = useState(query)
@@ -452,6 +458,25 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
         </div>
       ),
     },
+    ...(gajamadaStage
+      ? [
+          {
+            id: 'gajamada_unit',
+            header: 'Distribusi',
+            cell: ({ row }: { row: { original: PengaduanRow } }) => {
+              const unitName =
+                row.original.gajamada_unit_tujuan ||
+                (row.original.unit as { nama?: string } | null)?.nama ||
+                '-'
+              return (
+                <span className="text-xs whitespace-nowrap max-w-[140px] block">
+                  {unitName}
+                </span>
+              )
+            },
+          } as ColumnDef<PengaduanRow>,
+        ]
+      : []),
     {
       id: 'aksi',
       header: 'Aksi',
@@ -519,7 +544,7 @@ export function PengaduanTable({ data, total, page, query = '', userRole, userId
         )
       },
     },
-  ], [page, searchParams, sortBy, sortOrder, userRole, openMergeModal, router, kronologiLocked])
+  ], [page, searchParams, sortBy, sortOrder, userRole, openMergeModal, router, kronologiLocked, gajamadaStage])
 
   const isSyaratLengkap = syaratPerdamaian.materil_keresahan &&
     syaratPerdamaian.materil_konflik &&

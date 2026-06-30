@@ -101,6 +101,22 @@ export interface GajamadaActionParams {
   note?: string;
 }
 
+export interface GajamadaUnitOption {
+  unit: string;
+  sub_function: string;
+}
+
+export interface GajamadaUnitListResponse {
+  metaData: {
+    pagination: GajamadaPagination;
+    status: boolean;
+    responseCode: number;
+    message: string;
+    execution_time: number;
+  };
+  data: GajamadaUnitOption[];
+}
+
 export interface GajamadaActionResponse {
   metaData: {
     status: boolean;

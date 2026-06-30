@@ -95,16 +95,15 @@ export async function getPengaduanList(filters: SearchFilters = {}) {
   if (filters.tglTo) query = query.lte('tgl_pengaduan', filters.tglTo);
   if (filters.atensi) query = query.eq('atensi', true);
 
-  // Gajamada stage filter
+  // Gajamada stage filter — Subbid Paminal (pakai kolom yang sudah ada)
   if (filters.gajamadaStage === 'all_gajamada') {
     query = query.not('gajamada_id', 'is', null);
-  } else if (filters.gajamadaStage === 'subbid') {
-    query = query.not('gajamada_id', 'is', null).ilike('gajamada_status', '%Kasubbid Paminal%');
-  } else if (filters.gajamadaStage === 'distributed') {
-    query = query
-      .not('gajamada_id', 'is', null)
-      .ilike('gajamada_status', '%Kasubbid Paminal%')
-      .not('unit_id', 'is', null);
+  } else if (filters.gajamadaStage === 'subbid_all') {
+    query = query.not('gajamada_id', 'is', null);
+  } else if (filters.gajamadaStage === 'subbid_menunggu') {
+    query = query.not('gajamada_id', 'is', null).is('unit_id', null);
+  } else if (filters.gajamadaStage === 'subbid_distributed') {
+    query = query.not('gajamada_id', 'is', null).not('unit_id', 'is', null);
   }
 
   // Sort

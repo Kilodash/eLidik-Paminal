@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireTenant, requireRole } from '@/lib/auth'
 import { syncGajamadaIntake } from '@/lib/gajamada/sync'
 import { enrichGajamadaPengaduan, enrichSinglePengaduan } from '@/lib/gajamada/enrich'
+import { createGajamadaClient } from '@/lib/gajamada/client'
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message
@@ -570,6 +571,127 @@ export async function enrichSinglePengaduanAction(pengaduanId: string) {
   } catch (error: unknown) {
     console.error('Error enriching single pengaduan:', error)
     return { error: getErrorMessage(error) || 'Gagal enrichment AI' }
+  }
+}
+
+export async function fetchGajamadaUnitOptionsAction(subFunction: string) {
+  try {
+    await requireRole('admin_subbid', 'oversight')
+    const tenantId = await requireTenant()
+
+    const supabase = await createClient()
+    const { data: vars } = await supabase
+      .from('tenant_variables')
+      .select('key, value')
+      .eq('tenant_id', tenantId)
+
+    const varMap: Record<string, string> = {}
+    for (const row of vars || []) {
+      if (row.key && row.value) varMap[row.key] = row.value
+    }
+
+    const connectionId = varMap['gajamada_connection_id'] || '245b8fd7c4a763019d5172fad5ec0086'
+
+    const client = createGajamadaClient()
+    await client.login()
+
+    const options = await client.fetchUnitOptions(connectionId, subFunction)
+
+    return { success: true, data: options }
+  } catch (error: unknown) {
+    console.error('Error fetching Gajamada unit options:', error)
+    return { error: getErrorMessage(error) || 'Gagal memuat unit' }
+  }
+}
+
+export async function terimaDanDistribusikanGajamadaAction(
+  pengaduanId: string,
+  unitName: string,
+  note: string,
+  tglDisposisi: string,
+) {
+  try {
+    await requireRole('admin_subbid', 'oversight')
+    const tenantId = await requireTenant()
+    const supabase = await createClient()
+
+    const { data: pengaduan } = await supabase
+      .from('pengaduan')
+      .select('*, tenant:tenants(nama)')
+      .eq('id', pengaduanId)
+      .eq('tenant_id', tenantId)
+      .single()
+
+    if (!pengaduan) return { error: 'Pengaduan tidak ditemukan' }
+    if (!pengaduan.gajamada_id) return { error: 'Pengaduan bukan dari Gajamada' }
+
+    const tenantNama = pengaduan.tenant?.nama || ''
+    const poldaName = 'POLDA ' + tenantNama.replace(/^Polda\s+/i, '').toUpperCase()
+
+    const { data: vars } = await supabase
+      .from('tenant_variables')
+      .select('key, value')
+      .eq('tenant_id', tenantId)
+
+    const varMap: Record<string, string> = {}
+    for (const row of vars || []) {
+      if (row.key && row.value) varMap[row.key] = row.value
+    }
+
+    const gatewayId = varMap['gajamada_gateway_id'] || 'aa6159ec4d7847e8282943f7dfe87c29'
+    const widgetId = varMap['gajamada_action_widget_id'] || '6f2cfeabd19ddafce8fc98f5c9d9ad63'
+    const menuId = varMap['gajamada_action_menu_id'] || '01f63e60376afe827638ed614e1cea76'
+    const dashboardId = varMap['gajamada_dashboard_id'] || '1769155096865'
+    const userId = varMap['gajamada_action_user_id'] || 'a07611b17f063f8b5460f2eaa5c7deda'
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const personelNama = user?.user_metadata?.nama_lengkap || user?.email || 'Petugas'
+
+    const client = createGajamadaClient()
+    await client.login()
+
+    const result = await client.terimaDanDistribusikan(
+      {
+        reportId: pengaduan.gajamada_id,
+        unitName,
+        poldaName,
+        note,
+        createdBy: personelNama,
+      },
+      { gatewayId, widgetId, menuId, dashboardId, userId },
+    )
+
+    if (!result.data?.response?.success) {
+      return { error: result.data?.response?.message || 'Gagal distribusi Gajamada' }
+    }
+
+    const { data: orgRow } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('nama', unitName)
+      .maybeSingle()
+
+    const { error: updateError } = await supabase
+      .from('pengaduan')
+      .update({
+        unit_id: orgRow?.id || null,
+        gajamada_unit_tujuan: unitName,
+        gajamada_case_position: `${unitName} ${poldaName}`,
+        tgl_disposisi_kasubbid: tglDisposisi,
+        disposisi_kasubbid_catatan: note,
+        disposisi_kasubbid: ['TINDAKLANJUTI'],
+      })
+      .eq('id', pengaduanId)
+      .eq('tenant_id', tenantId)
+
+    if (updateError) throw updateError
+
+    revalidatePath('/pengaduan')
+    return { success: true, message: `Laporan didistribusikan ke ${unitName}` }
+  } catch (error: unknown) {
+    console.error('Error terima dan distribusikan Gajamada:', error)
+    return { error: getErrorMessage(error) || 'Gagal distribusi Gajamada' }
   }
 }
 

@@ -101,8 +101,15 @@ export interface Pengaduan {
   created_at: string;
   // Gajamada
   gajamada_id?: string | null;
+  gajamada_p_id?: string | null;
   gajamada_status?: string | null;
   gajamada_synced_at?: string | null;
+  gajamada_polda?: string | null;
+  gajamada_sub_function?: string | null;
+  gajamada_case_position?: string | null;
+  gajamada_unit_tujuan?: string | null;
+  tgl_disposisi_kasubbid?: string | null;
+  disposisi_kasubbid_catatan?: string | null;
   pelapor_email?: string | null;
   pelapor_nik?: string | null;
   pelapor_total_report?: number | null;

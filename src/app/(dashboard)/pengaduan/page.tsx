@@ -1,7 +1,7 @@
 ﻿import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getPengaduanList, getPengaduanById } from '@/lib/data/pengaduan'
-import { getWilayahSatkerList, getJenisPengaduanList, getUnitList, getKlasifikasiList } from '@/lib/data/master'
+import { getWilayahSatkerList, getJenisPengaduanList, getKlasifikasiList } from '@/lib/data/master'
 import { getPersonel } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { PengaduanTable } from '@/components/layout/pengaduan-table'
@@ -11,10 +11,8 @@ import { savePengaduan } from './actions'
 import { ClearableDatePicker, ClearableSelect } from '@/components/ui/clearable-fields'
 import { ResetButton } from '@/components/ui/reset-button'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { NameInput } from '@/components/ui/name-input'
 import { UppercaseInput, SentenceCaseTextarea } from '@/components/ui/format-inputs'
-import { Textarea } from '@/components/ui/textarea'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -25,10 +23,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { DistribusiForm } from '@/components/pengaduan/distribusi-form'
 import { AiEnrichButton } from '@/components/pengaduan/ai-enrich-button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { PengaduanFormNav } from '@/components/pengaduan/pengaduan-form-nav'
+import { GajamadaDistribusiPanel } from '@/components/pengaduan/gajamada-distribusi-panel'
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -41,7 +39,6 @@ export default async function PengaduanListPage({ searchParams }: Props) {
   const wilayahSatker = await getWilayahSatkerList()
   const jenisPengaduan = await getJenisPengaduanList()
   const klasifikasiList = await getKlasifikasiList()
-  const units = await getUnitList()
 
   const sp = await searchParams
   const editIdRaw = sp.edit as string | undefined
@@ -74,16 +71,25 @@ export default async function PengaduanListPage({ searchParams }: Props) {
   const unitId = String(sp.unit || '')
   const klasifikasiId = String(sp.klasifikasi || '')
   const overdue = sp.overdue === 'true'
+  const gajamadaStage = String(sp.gajamadaStage || '')
+  const activeTab = String(sp.tab || 'tabel-dumas')
   const sortBy = String(sp.sort || 'tgl_pengaduan')
   const sortOrder = (sp.order === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc'
+
+  // Default filter for admin_subbid/oversight: show only Subbid Paminal reports
+  const isSubbidRole = personel.role === 'admin_subbid' || personel.role === 'oversight'
+  const isOperator = personel.role === 'operator_unit'
+  const resolvedGajamadaStage = gajamadaStage || (isSubbidRole ? 'subbid_all' : '')
+  const resolvedUnitId = isOperator ? (personel.organization_id || 'none') : unitId
 
   const { data, total } = await getPengaduanList({
     page,
     query: query || undefined,
     status: statusParam ? statusParam.split(',') : undefined,
-    unitId: unitId || undefined,
+    unitId: resolvedUnitId || undefined,
     klasifikasiId: klasifikasiId || undefined,
     overdue: overdue || undefined,
+    gajamadaStage: resolvedGajamadaStage || undefined,
     sortBy,
     sortOrder,
   })
@@ -111,6 +117,8 @@ export default async function PengaduanListPage({ searchParams }: Props) {
     add('unit', sp.unit)
     add('klasifikasi', sp.klasifikasi)
     add('overdue', sp.overdue)
+    add('gajamadaStage', sp.gajamadaStage)
+    add('tab', sp.tab)  
     add('sort', sp.sort)
     add('order', sp.order)
     add('page', sp.page)
@@ -250,11 +258,11 @@ export default async function PengaduanListPage({ searchParams }: Props) {
           </>
         }
         tablePanel={
-          <Tabs defaultValue="tabel-dumas" className="w-full h-full flex flex-col">
+          <Tabs defaultValue={activeTab || 'tabel-dumas'} className="w-full h-full flex flex-col">
             <div className="bg-muted/30 border-b border-black pt-2 px-2 flex items-center justify-between">
               <TabsList className="bg-transparent h-auto p-0 flex space-x-1">
                 <TabsTrigger value="tabel-dumas" className="data-[state=active]:bg-card data-[state=active]:border-t-black data-[state=active]:border-x-black border-transparent border-t border-x rounded-t-md rounded-b-none px-4 py-2 text-xs font-bold text-muted-foreground data-[state=active]:text-foreground shadow-none">TABEL DUMAS</TabsTrigger>
-                {(personel.role === "admin_subbid" || personel.role === "oversight") && <TabsTrigger value="tindak-lanjut" className="data-[state=active]:bg-card data-[state=active]:border-t-black data-[state=active]:border-x-black border-transparent border-t border-x rounded-t-md rounded-b-none px-4 py-2 text-xs font-bold text-muted-foreground data-[state=active]:text-foreground shadow-none">DISTRIBUSI</TabsTrigger>}
+                {(personel.role === "admin_subbid" || personel.role === "oversight") && <TabsTrigger value="distribusi" className="data-[state=active]:bg-card data-[state=active]:border-t-black data-[state=active]:border-x-black border-transparent border-t border-x rounded-t-md rounded-b-none px-4 py-2 text-xs font-bold text-muted-foreground data-[state=active]:text-foreground shadow-none">DISTRIBUSI</TabsTrigger>}
                 <TabsTrigger value="anev-dumas" className="data-[state=active]:bg-card data-[state=active]:border-t-black data-[state=active]:border-x-black border-transparent border-t border-x rounded-t-md rounded-b-none px-4 py-2 text-xs font-bold text-muted-foreground data-[state=active]:text-foreground shadow-none">PENYELIDIKAN</TabsTrigger>
                 <TabsTrigger value="anev-unit" className="data-[state=active]:bg-card data-[state=active]:border-t-black data-[state=active]:border-x-black border-transparent border-t border-x rounded-t-md rounded-b-none px-4 py-2 text-xs font-bold text-muted-foreground data-[state=active]:text-foreground shadow-none">TINJUT HASIL</TabsTrigger>
                 <TabsTrigger value="rekap" className="data-[state=active]:bg-card data-[state=active]:border-t-black data-[state=active]:border-x-black border-transparent border-t border-x rounded-t-md rounded-b-none px-4 py-2 text-xs font-bold text-muted-foreground data-[state=active]:text-foreground shadow-none">REKAP PENANGANAN</TabsTrigger>
@@ -264,29 +272,56 @@ export default async function PengaduanListPage({ searchParams }: Props) {
               </Link>
             </div>
 
+            {/* Quick filter chips untuk Subbid Paminal */}
+            {isSubbidRole && (
+              <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-card/50 overflow-x-auto">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">Filter:</span>
+                {[
+                  { label: 'Semua Subbid', stage: 'subbid_all' },
+                  { label: 'Menunggu Distribusi', stage: 'subbid_menunggu' },
+                  { label: 'Sudah Distribusi', stage: 'subbid_distributed' },
+                ].map((f) => {
+                  const isActive = (resolvedGajamadaStage || 'subbid_all') === f.stage
+                  const href = `/pengaduan?gajamadaStage=${f.stage}&tab=${activeTab}`
+                  return (
+                    <Link key={f.stage} href={href}>
+                      <Button
+                        variant={isActive ? 'default' : 'ghost'}
+                        size="sm"
+                        className="h-6 text-[11px] px-2 rounded-full"
+                      >
+                        {f.label}
+                      </Button>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+
             <TabsContent value="tabel-dumas" className="flex-1 m-0 flex flex-col overflow-hidden outline-none">
               <div className="flex-1 overflow-auto p-4 custom-scrollbar">
-                <PengaduanTable data={data} total={total} page={page} query={query} userRole={personel.role} userId={personel.id} sortBy={sortBy} sortOrder={sortOrder} />
+                <PengaduanTable
+                  data={data}
+                  total={total}
+                  page={page}
+                  query={query}
+                  userRole={personel.role}
+                  userId={personel.id}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  gajamadaStage={resolvedGajamadaStage}
+                />
               </div>
             </TabsContent>
-                        {(personel.role === "admin_subbid" || personel.role === "oversight") && <TabsContent value="tindak-lanjut" className="flex-1 m-0 p-4 overflow-y-auto">
-              <div className="space-y-6">
-                {editData ? (
-                  <DistribusiForm 
-                    pengaduanId={editData.id} 
-                    currentUnitId={editData.unit_id} 
-                    units={units}
-                    initialDisposisiKabid={editData.disposisi_kabid}
-                    initialDisposisiKasubbid={editData.disposisi_kasubbid}
-                    initialDisposisiTambahan={editData.disposisi_tambahan}
-                  />
-                ) : (
-                  <div className="text-sm text-muted-foreground flex flex-col items-center justify-center py-20 border border-dashed rounded-lg">
-                    <p>Silakan klik tombol Edit (Pencil) pada salah satu data pengaduan di Tabel Dumas</p>
-                    <p className="mt-1">untuk membuka Tindak Lanjut Distribusi.</p>
-                  </div>
-                )}
-              </div>
+            {(personel.role === "admin_subbid" || personel.role === "oversight") && <TabsContent value="distribusi" className="flex-1 m-0 overflow-hidden">
+              <GajamadaDistribusiPanel
+                pengaduan={editData}
+                ids={pengaduanIds}
+                currentId={editId}
+                baseParams={baseParams}
+                page={page}
+                hasNextPage={page * 20 < total}
+              />
             </TabsContent>}
             <TabsContent value="anev-dumas" className="flex-1 m-0 p-4 overflow-y-auto">
               <EmptyState title="Penyelidikan" description="Fitur analisa dan evaluasi penyelidikan akan segera tersedia." />

@@ -6,6 +6,8 @@ import type {
   GajamadaReport,
   GajamadaActionParams,
   GajamadaActionResponse,
+  GajamadaUnitOption,
+  GajamadaUnitListResponse,
 } from './types';
 
 export class GajamadaClient {
@@ -183,6 +185,86 @@ export class GajamadaClient {
     return all;
   }
 
+  async fetchUnitOptions(
+    connectionId: string,
+    subFunction: string,
+    search?: string,
+  ): Promise<GajamadaUnitOption[]> {
+    this.ensureLoggedIn();
+
+    const filters = [
+      {
+        field: 'sub_function',
+        operator: 'is',
+        table: 'dimension.catalog_unit_name',
+        fieldType: 'text',
+        value: { is: subFunction },
+      },
+    ];
+
+    const payload: Record<string, unknown> = {
+      orderBy: 'unit',
+      order: 'asc',
+      page: 1,
+      size: 1000,
+      connectionId,
+      table: 'dimension.catalog_unit_name',
+      database: 'divpropam',
+      filters,
+    };
+
+    if (search) {
+      payload.search = search;
+      payload.search_by = ['unit'];
+    }
+
+    const res = await this.fetch(
+      this.url('/api/v1/apps/data/management/get-all'),
+      {
+        method: 'POST',
+        headers: this.defaultHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      },
+    );
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Gajamada fetch unit options failed: ${res.status} ${text}`);
+    }
+
+    const result = (await res.json()) as GajamadaUnitListResponse;
+    return (result.data || []).filter((o) => o.unit?.trim());
+  }
+
+  async terimaDanDistribusikan(
+    params: {
+      reportId: string;
+      unitName: string;
+      poldaName: string;
+      note: string;
+      createdBy: string;
+    },
+    config: {
+      gatewayId: string;
+      widgetId: string;
+      menuId: string;
+      dashboardId: string;
+      userId: string;
+    },
+  ): Promise<GajamadaActionResponse> {
+    return this.executeAction(
+      {
+        reportId: params.reportId,
+        status: 'Laporan Diterima',
+        casePosition: `${params.unitName} ${params.poldaName}`,
+        note: params.note,
+        createdBy: params.createdBy,
+      },
+      config,
+    );
+  }
+
   async executeAction(
     params: GajamadaActionParams,
     config: {
@@ -195,17 +277,22 @@ export class GajamadaClient {
   ): Promise<GajamadaActionResponse> {
     this.ensureLoggedIn();
 
+    const actionParams: Record<string, string> = {
+      report_id: params.reportId,
+      note: params.note || '',
+      createdBy: params.createdBy,
+      status: params.status,
+      case_position: params.casePosition,
+    };
+
+    if (params.caseHandover) {
+      actionParams.case_handover = params.caseHandover;
+    }
+
     const payload = {
       client: 'Propam Polri',
       gatewayId: config.gatewayId,
-      params: {
-        report_id: params.reportId,
-        note: params.note || '',
-        createdBy: params.createdBy,
-        case_handover: params.caseHandover || '',
-        status: params.status,
-        case_position: params.casePosition,
-      },
+      params: actionParams,
       body: {},
       headers: {},
       additionalPath: '',

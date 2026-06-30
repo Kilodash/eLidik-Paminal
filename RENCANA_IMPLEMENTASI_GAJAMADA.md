@@ -281,14 +281,39 @@ Dengan pola ini, nambah subbid baru hanya perlu:
 
 ---
 
-## 10. Catatan Risiko
+## 11. Status Implementasi (30 Juni 2026)
 
-- Gateway Gajamada mungkin memvalidasi status sebelumnya. Jika laporan belum berada di status yang diizinkan, distribusi bisa gagal. Perlu handle error dengan baik.
-- `createdBy` di payload Gajamada bersifat teks; gunakan `personel.nama_lengkap`.
-- Jika unit/UR dipilih tidak cocok dengan mapping `organizations`, `unit_id` bisa null. Perlu fallback dan warning.
-- Jika ada perubahan langsung di Gajamada, e-Lidik perlu sync ulang agar `unit_id` dan `gajamada_case_position` tetap sinkron.
+### Sudah selesai
+- [x] Migration `021_subbid_paminal_distribution.sql` (belum dijalankan di Supabase)
+- [x] `GajamadaClient.fetchUnitOptions()` + `terimaDanDistribusikan()`
+- [x] `executeAction()` tidak lagi mengirim `case_handover` kosong
+- [x] Server action `fetchGajamadaUnitOptionsAction` + `terimaDanDistribusikanGajamadaAction`
+- [x] Filter Tabel Dumas: `subbid_all` / `subbid_menunggu` / `subbid_distributed`
+- [x] Default filter `admin_subbid`/`oversight` ke `subbid_all`
+- [x] `operator_unit` otomatis filter `unit_id = personel.organization_id`
+- [x] Quick filter chips di atas Tabel Dumas
+- [x] Tab **DISTRIBUSI** menggantikan tab `tindak-lanjut` lama
+- [x] `GajamadaDistribusiPanel`: detail + form unit/UR + navigasi next/prev
+- [x] Organisasi unit/UR di-rename ke nama Gajamada (via migration)
+- [x] Lint & build passing (0 errors)
+
+### Belum selesai (perlu migration + uncomment)
+- [ ] Jalankan `supabase db push` untuk migration `020` dan `021`
+- [ ] Uncomment `gajamada_polda` dan `gajamada_case_position` di `sync.ts`
+- [ ] Filter Subbid Paminal diperketat pakai `gajamada_case_position` (setelah kolom ada)
+
+### Untuk sesi berikutnya
+1. Jalankan migration: `supabase db push` atau manual dari file SQL.
+2. Buka `src/lib/gajamada/sync.ts`, uncomment 2 baris.
+3. Buka `src/lib/data/pengaduan.ts`, ganti filter `subbid_*` dari `gajamada_id IS NOT NULL` ke filter spesifik `gajamada_case_position ILIKE`.
+4. Uji coba:
+   - Sinkron Gajamada → lihat di Tabel Dumas.
+   - Klik Distribusi → pilih unit/UR → isi catatan → klik "Terima & Distribusikan".
+   - Verifikasi di Gajamada bahwa `case_position` berubah.
+   - Verifikasi di e-Lidik bahwa `unit_id` terisi.
 
 ---
 
 *Dibuat: 30 Juni 2026*  
+*Diperbarui: 30 Juni 2026 — implementasi backend + frontend selesai*  
 *Fokus: Phase 1 — Subbid Paminal*

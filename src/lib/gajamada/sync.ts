@@ -199,6 +199,9 @@ export async function syncGajamadaIntake({
         gajamada_id: r.id,
         gajamada_p_id: r.p_id,
         gajamada_status: r.status_label,
+        // gajamada_polda dan gajamada_case_position perlu migration 021 dijalankan
+        // gajamada_polda: r.disposisi_polda || r.polda || null,
+        // gajamada_case_position: r.disposisi_case_position || null,
         gajamada_synced_at: new Date().toISOString(),
         nomor_register: r.id,
         nomor_surat: r.id,

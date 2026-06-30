@@ -81,6 +81,7 @@ export default async function PengaduanListPage({ searchParams }: Props) {
   const klasifikasiId = String(sp.klasifikasi || '');
   const overdue = sp.overdue === 'true';
   const atensi = sp.atensi === 'true' ? 'true' : '';
+  const gajamadaStage = String(sp.gajamadaStage || '');
   const sortBy = String(sp.sort || 'tgl_pengaduan');
   const sortOrder = (sp.order === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc';
   const activeTab = String(sp.tab || 'tabel-dumas');
@@ -94,6 +95,7 @@ export default async function PengaduanListPage({ searchParams }: Props) {
     overdue: overdue || undefined,
     sortBy,
     sortOrder,
+    gajamadaStage: gajamadaStage || undefined,
   });
 
   // Resolve _first marker to actual first ID on this page
@@ -131,6 +133,7 @@ export default async function PengaduanListPage({ searchParams }: Props) {
     add('unit', sp.unit);
     add('klasifikasi', sp.klasifikasi);
     add('overdue', sp.overdue);
+    add('gajamadaStage', sp.gajamadaStage);
     add('sort', sp.sort);
     add('order', sp.order);
     add('page', sp.page);
@@ -425,6 +428,7 @@ export default async function PengaduanListPage({ searchParams }: Props) {
                   unitFilter={unitId}
                   klasifikasiFilter={klasifikasiId}
                   atensiFilter={atensi}
+                  gajamadaStageFilter={gajamadaStage}
                 />
               </div>
             </TabsContent>

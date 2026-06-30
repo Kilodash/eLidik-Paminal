@@ -91,3 +91,46 @@ export interface GajamadaClientConfig {
   username: string;
   password: string;
 }
+
+export interface GajamadaActionParams {
+  reportId: string;
+  casePosition: string;
+  status: string;
+  caseHandover?: string;
+  createdBy: string;
+  note?: string;
+}
+
+export interface GajamadaActionResponse {
+  metaData: {
+    status: boolean;
+    responseCode: number;
+    message: string;
+    execution_time: number;
+  };
+  data: {
+    response_status_code: number;
+    executionStatus: string;
+    response: {
+      success: boolean;
+      status: number;
+      data: {
+        report_id: string;
+        status: string;
+        disposisi_created: boolean;
+        disposisi: {
+          report_id: string;
+          case_position: string;
+          police_function: string;
+          police_level: string;
+          sub_function: string;
+          polda: string;
+          polda_code: string;
+          polres: string | null;
+          satker: string | null;
+        };
+      };
+      message: string;
+    };
+  };
+}

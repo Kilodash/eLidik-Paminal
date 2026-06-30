@@ -80,6 +80,7 @@ interface Props {
   unitFilter?: string;
   klasifikasiFilter?: string;
   atensiFilter?: string;
+  gajamadaStageFilter?: string;
 }
 
 export function PengaduanTable({
@@ -97,6 +98,7 @@ export function PengaduanTable({
   unitFilter = '',
   klasifikasiFilter = '',
   atensiFilter = '',
+  gajamadaStageFilter = '',
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -678,6 +680,21 @@ export function PengaduanTable({
           <SelectContent>
             <SelectItem value="all">Semua</SelectItem>
             <SelectItem value="true">Atensi saja</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={gajamadaStageFilter || 'all'}
+          onValueChange={(v) => updateFilter('gajamadaStage', v ?? '')}
+        >
+          <SelectTrigger className="h-8 w-[180px] text-xs">
+            <SelectValue placeholder="Tahap Gajamada" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua Pengaduan</SelectItem>
+            <SelectItem value="all_gajamada">Pelimpahan ke Polda</SelectItem>
+            <SelectItem value="subbid">Diterima Subbid Paminal</SelectItem>
+            <SelectItem value="distributed">Sudah Didistribusi ke Unit</SelectItem>
           </SelectContent>
         </Select>
       </div>

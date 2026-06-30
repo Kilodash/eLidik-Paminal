@@ -4,6 +4,8 @@ import type {
   GajamadaFetchParams,
   GajamadaListResponse,
   GajamadaReport,
+  GajamadaActionParams,
+  GajamadaActionResponse,
 } from './types';
 
 export class GajamadaClient {
@@ -179,6 +181,69 @@ export class GajamadaClient {
 
     console.log(`[Gajamada] Fetched ${all.length} total items`);
     return all;
+  }
+
+  async executeAction(
+    params: GajamadaActionParams,
+    config: {
+      gatewayId: string;
+      widgetId: string;
+      menuId: string;
+      dashboardId: string;
+      userId: string;
+    },
+  ): Promise<GajamadaActionResponse> {
+    this.ensureLoggedIn();
+
+    const payload = {
+      client: 'Propam Polri',
+      gatewayId: config.gatewayId,
+      params: {
+        report_id: params.reportId,
+        note: params.note || '',
+        createdBy: params.createdBy,
+        case_handover: params.caseHandover || '',
+        status: params.status,
+        case_position: params.casePosition,
+      },
+      body: {},
+      headers: {},
+      additionalPath: '',
+      additionalParams: {},
+      additionalFileParams: {},
+      tags: ['Propam Polri'],
+      createdBy: config.userId,
+      startDate: '',
+      endDate: '',
+      dashboardId: config.dashboardId,
+      sessionId: '',
+      logging: false,
+      appendedLog: false,
+      metaData: {
+        widgetId: config.widgetId,
+        widgetName: 'Widget Aksi',
+        menuId: config.menuId,
+        menuName: 'Detail Laporan',
+        dashboardId: config.dashboardId,
+        dashboardName: 'Propam Aduan',
+        userId: config.userId,
+        domain: '',
+      },
+    };
+
+    const res = await this.fetch(this.url('/api/v1/apps/api/gateway/execute'), {
+      method: 'POST',
+      headers: this.defaultHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Gajamada action failed: ${res.status} ${text}`);
+    }
+
+    return (await res.json()) as GajamadaActionResponse;
   }
 }
 

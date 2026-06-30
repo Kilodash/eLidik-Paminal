@@ -1,10 +1,10 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { cn } from '@/lib/utils'
-import { useSidebar } from '@/components/layout/sidebar-context'
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { useSidebar } from '@/components/layout/sidebar-context';
 import {
   LayoutDashboard,
   FileText,
@@ -20,68 +20,89 @@ import {
   MapPin,
   Tags,
   Variable,
+  ListChecks,
   Wrench,
   LayoutTemplate,
   Sparkles,
-} from 'lucide-react'
-import { Separator } from '@/components/ui/separator'
+  UserCog,
+} from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
 const mainItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/pengaduan', label: 'Pengaduan', icon: FileText },
   { href: '/berkas', label: 'Berkas', icon: FolderOpen },
   { href: '/dokumen', label: 'Dokumen', icon: FileCheck },
-]
+];
 
 const pengaturanItems = [
   { href: '/pengaturan/organisasi', label: 'Organisasi', icon: Building2 },
+  { href: '/pengaturan/user', label: 'User (Akun Login)', icon: UserCog },
   { href: '/pengaturan/personel', label: 'Personel', icon: Users },
   { href: '/pengaturan/wilayah', label: 'Wilayah / Satker', icon: MapPin },
   { href: '/pengaturan/jenis-pengaduan', label: 'Jenis Pengaduan', icon: Tags },
   { href: '/pengaturan/klasifikasi', label: 'Klasifikasi', icon: Tags },
+  { href: '/pengaturan/disposisi', label: 'Disposisi', icon: ListChecks },
   { href: '/pengaturan/variabel', label: 'Variabel Dokumen', icon: Variable },
   { href: '/pengaturan/sistem', label: 'Sistem Lain', icon: Wrench },
   { href: '/pengaturan/ai', label: 'Pengaturan AI', icon: Sparkles },
   { href: '/master/template-variabel', label: 'Template Variabel', icon: LayoutTemplate },
-]
+];
 
 interface SidebarProps {
-  onLogout: () => void
+  onLogout: () => void;
 }
 
 export function Sidebar({ onLogout }: SidebarProps) {
-  const pathname = usePathname()
-  const { collapsed, toggle } = useSidebar()
-  const [pengaturanOpen, setPengaturanOpen] = useState(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem('sidebar-pengaturan-open') !== 'false'
-    return true
-  })
+  const pathname = usePathname();
+  const { collapsed, toggle } = useSidebar();
+  const [pengaturanOpen, setPengaturanOpen] = useState<boolean>(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+    const stored = localStorage.getItem('sidebar-pengaturan-open');
+    if (stored !== null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPengaturanOpen(stored !== 'false');
+    }
+  }, []);
 
   const isActive = (href: string) => {
-    if (href === '/') return pathname === '/'
-    return pathname === href || pathname.startsWith(href + '/')
-  }
+    if (href === '/') return pathname === '/';
+    return pathname === href || pathname.startsWith(href + '/');
+  };
 
   const togglePengaturan = () => {
-    const next = !pengaturanOpen
-    setPengaturanOpen(next)
-    localStorage.setItem('sidebar-pengaturan-open', String(next))
-  }
+    const next = !pengaturanOpen;
+    setPengaturanOpen(next);
+    localStorage.setItem('sidebar-pengaturan-open', String(next));
+  };
 
-  const isPengaturanActive = pengaturanItems.some((item) => isActive(item.href))
+  const isPengaturanActive = pengaturanItems.some((item) => isActive(item.href));
 
   return (
     <aside
       className={cn(
         'flex flex-col border-r bg-card transition-all duration-300 ease-in-out h-screen sticky top-0',
-        collapsed ? 'w-16' : 'w-64'
+        collapsed ? 'w-16' : 'w-64',
       )}
     >
-      <div className={cn('flex items-center h-14 px-3', collapsed ? 'justify-center' : 'justify-between')}>
+      <div
+        className={cn(
+          'flex items-center h-14 px-3',
+          collapsed ? 'justify-center' : 'justify-between',
+        )}
+      >
         {!collapsed && (
           <div className="overflow-hidden">
-            <h1 className="text-base font-bold text-primary leading-tight tracking-tight">e-Lidik Paminal</h1>
-            <p className="text-[10px] text-muted-foreground leading-tight">Bidpropam / Subbid Paminal</p>
+            <h1 className="text-base font-bold text-primary leading-tight tracking-tight">
+              e-Lidik Paminal
+            </h1>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Bidpropam / Subbid Paminal
+            </p>
           </div>
         )}
         <button
@@ -97,7 +118,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
 
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {mainItems.map((item) => {
-          const active = isActive(item.href)
+          const active = isActive(item.href);
           return (
             <Link
               key={item.href}
@@ -108,13 +129,13 @@ export function Sidebar({ onLogout }: SidebarProps) {
                 collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2',
                 active
                   ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
               )}
             >
               <item.icon className={cn('h-5 w-5 shrink-0', active && 'text-primary-foreground')} />
               {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
             </Link>
-          )
+          );
         })}
 
         {!collapsed && <Separator className="my-2" />}
@@ -127,17 +148,22 @@ export function Sidebar({ onLogout }: SidebarProps) {
                 'flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm transition-all duration-200',
                 isPengaturanActive
                   ? 'text-primary font-medium'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
               )}
             >
               <Settings className="h-5 w-5 shrink-0" />
               <span className="text-sm font-medium flex-1 text-left">Pengaturan</span>
-              <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform duration-200', pengaturanOpen && 'rotate-180')} />
+              <ChevronDown
+                className={cn(
+                  'h-4 w-4 shrink-0 transition-transform duration-200',
+                  mounted && pengaturanOpen && 'rotate-180',
+                )}
+              />
             </button>
-            {pengaturanOpen && (
+            {mounted && pengaturanOpen && (
               <div className="ml-4 mt-1 space-y-0.5 border-l pl-3">
                 {pengaturanItems.map((item) => {
-                  const active = isActive(item.href)
+                  const active = isActive(item.href);
                   return (
                     <Link
                       key={item.href}
@@ -146,13 +172,13 @@ export function Sidebar({ onLogout }: SidebarProps) {
                         'flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors',
                         active
                           ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                       )}
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span className="text-[13px]">{item.label}</span>
                     </Link>
-                  )
+                  );
                 })}
               </div>
             )}
@@ -165,10 +191,12 @@ export function Sidebar({ onLogout }: SidebarProps) {
               'flex items-center justify-center gap-3 rounded-lg py-2.5 transition-all duration-200',
               isPengaturanActive
                 ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
             )}
           >
-            <Settings className={cn('h-5 w-5 shrink-0', isPengaturanActive && 'text-primary-foreground')} />
+            <Settings
+              className={cn('h-5 w-5 shrink-0', isPengaturanActive && 'text-primary-foreground')}
+            />
           </Link>
         )}
       </nav>
@@ -181,7 +209,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
           title="Keluar"
           className={cn(
             'flex items-center gap-3 rounded-lg text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive w-full transition-colors',
-            collapsed ? 'justify-center p-2.5' : 'px-3 py-2'
+            collapsed ? 'justify-center p-2.5' : 'px-3 py-2',
           )}
         >
           <LogOut className="h-5 w-5 shrink-0" />
@@ -189,5 +217,5 @@ export function Sidebar({ onLogout }: SidebarProps) {
         </button>
       </div>
     </aside>
-  )
+  );
 }

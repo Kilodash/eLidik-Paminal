@@ -158,7 +158,7 @@ export default async function PengaduanListPage({ searchParams }: Props) {
             <img
               src="/logo-simondu.png"
               alt="Logo SIMONDU"
-              className="w-full h-auto object-cover"
+              className="w-full h-auto object-cover shrink-0 max-h-[80px]"
             />
 
             <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col">

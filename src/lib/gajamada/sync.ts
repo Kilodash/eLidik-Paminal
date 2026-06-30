@@ -197,6 +197,7 @@ export async function syncGajamadaIntake({
       return {
         tenant_id: tenantId,
         gajamada_id: r.id,
+        gajamada_p_id: r.p_id,
         gajamada_status: r.status_label,
         gajamada_synced_at: new Date().toISOString(),
         nomor_register: r.id,

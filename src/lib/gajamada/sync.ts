@@ -38,6 +38,12 @@ function getFetchParams(vars: Record<string, string>): GajamadaFetchParams {
     statusExclude = [];
   }
 
+  // Fallback: kalau gajamada_disposisi_polda kosong, derive dari nama_polda
+  let disposisiPolda = vars['gajamada_disposisi_polda'] || '';
+  if (!disposisiPolda && vars['nama_polda']) {
+    disposisiPolda = 'POLDA ' + vars['nama_polda'].replace(/^Polda\s+/i, '').toUpperCase();
+  }
+
   return {
     baseUrl: process.env.GAJAMADA_BASE_URL || '',
     connectionId: vars['gajamada_connection_id'] || '',
@@ -49,9 +55,9 @@ function getFetchParams(vars: Record<string, string>): GajamadaFetchParams {
     mdmId: vars['gajamada_mdm_id'] || '',
     userId: vars['gajamada_user_id'] || '',
     domain: vars['gajamada_domain'] || 'gajamada-propam.polri.go.id',
-    disposisiPolda: vars['gajamada_disposisi_polda'] || '',
+    disposisiPolda,
     statusExclude,
-    size: 10,
+    size: 100,
   };
 }
 

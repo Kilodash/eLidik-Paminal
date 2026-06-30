@@ -373,9 +373,9 @@ export async function generateSingleDocumentAction(pengaduanId: string, docKode:
 
     revalidatePath('/pengaduan')
     return { success: true, message: `Dokumen "${docNama}" berhasil dibuat otomatis sebagai draf di database!` }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error generating document:', error)
-    return { error: error.message || 'Gagal membuat dokumen' }
+    return { error: getErrorMessage(error) || 'Gagal membuat dokumen' }
   }
 }
 
@@ -417,9 +417,9 @@ export async function updatePengaduanStatusAction(pengaduanId: string, newStatus
 
     revalidatePath('/pengaduan')
     return { success: true }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating pengaduan status:', error)
-    return { success: false, error: error.message || 'Gagal mengupdate status' }
+    return { success: false, error: getErrorMessage(error) || 'Gagal mengupdate status' }
   }
 }
 
@@ -463,9 +463,9 @@ export async function updateDistribusiAction(pengaduanId: string, unitId: string
 
     revalidatePath('/pengaduan')
     return { success: true }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in distribusi:', error)
-    return { success: false, error: error.message || 'Gagal menyimpan distribusi' }
+    return { success: false, error: getErrorMessage(error) || 'Gagal menyimpan distribusi' }
   }
 }
 
@@ -571,4 +571,17 @@ export async function enrichSinglePengaduanAction(pengaduanId: string) {
     console.error('Error enriching single pengaduan:', error)
     return { error: getErrorMessage(error) || 'Gagal enrichment AI' }
   }
+}
+
+// Stubs untuk fitur impor PROPAM yang sedang dikembangkan
+export async function checkUnsavedPropamDataAction() {
+  return { data: [] as unknown[], error: null }
+}
+
+export async function saveSinglePropamDataAction(_item: unknown) {
+  return { success: false, error: 'Fitur impor PROPAM belum diaktifkan' }
+}
+
+export async function bulkSavePropamDataAction(_items: unknown[]) {
+  return { success: true, imported: 0, skipped: 0, error: null }
 }

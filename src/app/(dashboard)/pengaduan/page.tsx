@@ -80,6 +80,7 @@ export default async function PengaduanListPage({ searchParams }: Props) {
   const unitId = String(sp.unit || '');
   const klasifikasiId = String(sp.klasifikasi || '');
   const overdue = sp.overdue === 'true';
+  const atensi = sp.atensi === 'true' ? 'true' : '';
   const sortBy = String(sp.sort || 'tgl_pengaduan');
   const sortOrder = (sp.order === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc';
   const activeTab = String(sp.tab || 'tabel-dumas');
@@ -418,6 +419,12 @@ export default async function PengaduanListPage({ searchParams }: Props) {
                   userId={personel.id}
                   sortBy={sortBy}
                   sortOrder={sortOrder}
+                  units={units.map((u) => ({ id: u.id, nama: u.nama || '' }))}
+                  klasifikasiList={klasifikasiList.map((k) => ({ id: k.id, nama: k.nama || '' }))}
+                  statusFilter={statusParam}
+                  unitFilter={unitId}
+                  klasifikasiFilter={klasifikasiId}
+                  atensiFilter={atensi}
                 />
               </div>
             </TabsContent>

@@ -107,7 +107,8 @@ export async function syncGajamadaIntake({
       .from('pengaduan')
       .select('gajamada_id')
       .eq('tenant_id', tenantId)
-      .not('gajamada_id', 'is', null);
+      .not('gajamada_id', 'is', null)
+      .limit(100000);
 
     const existingSet = new Set(
       (existingIds || []).map((r) => r.gajamada_id).filter(Boolean) as string[],
@@ -133,15 +134,25 @@ export async function syncGajamadaIntake({
       }
     }
 
-    if (reports.length === 0) {
+    // Dedup reports by gajamada_id (guard against duplicates within batch)
+    const seenIds = new Set<string>();
+    const uniqueReports = reports.filter((r) => {
+      if (seenIds.has(r.id)) return false;
+      seenIds.add(r.id);
+      return true;
+    });
+
+    if (uniqueReports.length === 0) {
       return { success: true, count: 0, skipped: existingSet.size, insertedIds: [] };
     }
 
     // Collect all new gajamada_ids for the final skip count
-    const newIds = reports.map((r) => r.id);
+    const newIds = uniqueReports.map((r) => r.id);
 
     // Build klasifikasi lookup: normalize category -> id
-    const categories = [...new Set(reports.map((r) => r.category).filter(Boolean))] as string[];
+    const categories = [
+      ...new Set(uniqueReports.map((r) => r.category).filter(Boolean)),
+    ] as string[];
     const normalizedKats = categories.map((c) => ({
       original: c,
       normalized: normalizeCategoryName(c),
@@ -179,7 +190,7 @@ export async function syncGajamadaIntake({
     }
 
     // Batch insert pengaduan
-    const pengaduanRows = reports.map((r) => {
+    const pengaduanRows = uniqueReports.map((r) => {
       const katKode = normalizeCategoryName(r.category)
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, '_');
@@ -208,7 +219,9 @@ export async function syncGajamadaIntake({
       };
     });
 
-    const { error: insertError } = await admin.from('pengaduan').insert(pengaduanRows);
+    const { error: insertError } = await admin
+      .from('pengaduan')
+      .upsert(pengaduanRows, { onConflict: 'gajamada_id', ignoreDuplicates: true });
     if (insertError) throw insertError;
 
     // Reload inserted IDs
@@ -224,7 +237,7 @@ export async function syncGajamadaIntake({
     }
 
     // Batch insert terlapor
-    const terlaporRows = reports.map((r) => {
+    const terlaporRows = uniqueReports.map((r) => {
       const nama = r.prepetrator_name?.trim() || 'Anggota Polri (identitas belum dikenali)';
       return {
         tenant_id: tenantId,
@@ -243,7 +256,7 @@ export async function syncGajamadaIntake({
     const insertedTerlapor = (insertedTerlaporRows || []).map((t, i) => ({ ...t, _idx: i }));
 
     // Batch insert pengaduan_terlapor link
-    const linkRows = reports
+    const linkRows = uniqueReports
       .map((r, i) => {
         const pengaduanId = idMap.get(r.id);
         const terlaporEntry = insertedTerlapor[i];
@@ -276,7 +289,7 @@ export async function syncGajamadaIntake({
 
     return {
       success: true,
-      count: reports.length,
+      count: uniqueReports.length,
       skipped: existingSet.size,
       insertedIds: insertedRows?.map((r) => r.id) || [],
     };
